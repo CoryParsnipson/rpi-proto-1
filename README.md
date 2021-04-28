@@ -17,7 +17,7 @@ Python version: 3.8.6+
 Qt version: 5.15.1
 Coin version: 4.0.1
 OCC version: 7.5.0
-Locale: English/United States (en\_US)
+Locale: English/United States (en_US)
 ```
 
 ## Functional Blocks
