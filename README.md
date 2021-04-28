@@ -3,8 +3,9 @@
 
 # About
 
-The models were made in FreeCAD 0.19.
+The models were made in FreeCAD 0.19. The Assembly4 addon was also installed.
 
+```
 OS: Windows 10 Version 2009
 Word size of OS: 64-bit
 Word size of FreeCAD: 64-bit
@@ -16,7 +17,8 @@ Python version: 3.8.6+
 Qt version: 5.15.1
 Coin version: 4.0.1
 OCC version: 7.5.0
-Locale: English/United States (en_US)
+Locale: English/United States (en\_US)
+```
 
 ## Functional Blocks
 
