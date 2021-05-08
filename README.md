@@ -22,6 +22,26 @@ Locale: English/United States (en_US)
 
 ## Functional Blocks
 
-* dpad\_test - This is a small test swatch for metal dome switch PCB trace. This also contains wire holders on the side which (for future reference) work really well for 22 AWG solid core wire.
+### dpad\_test [Status: failure (do not use)]
 
-* dpad\_tactile - This is a 3 piece jig for holding OMRON B3F-1000 tactile switches into a dpad configuration. A 2015 new nintendo 3ds (non XL) dpad and silicon mask go on top of the cover and underneath the dpad holder.
+This is a small test swatch for metal dome switch PCB trace. This also contains wire holders on the side which (for future reference) work really well for 22 AWG solid core wire.
+
+### dpad\_tactile [Status: success (up to date)]
+
+This is a 3 piece jig for holding OMRON B3F-1000 tactile switches into a dpad configuration. A 2015 new nintendo 3ds (non XL) dpad and silicon mask go on top of the cover and underneath the dpad holder.
+
+### thumbstick [Status: obsolete]
+
+This is designed to hold a Nintendo Switch thumbstick and (breakout board)[https://www.amazon.com/gp/product/B0191ELDL0/ref=ppx\_yo\_dt\_b\_asin\_title\_o06\_s00?ie=UTF8&psc=1] together.
+
+### thumbstick-v2 [Status: success (up to date)]
+
+This is designed to hold a Nintendo Switch thumbstick and (breakout board)[https://www.amazon.com/gp/product/B0191ELDL0/ref=ppx\_yo\_dt\_b\_asin\_title\_o06\_s00?ie=UTF8&psc=1] together. This version uses two pieces to hold everything in place and requires printing the top piece with supports.
+
+### shoulder-buttons-left-v1 [Status: obsolete]
+
+This contains a 2 piece shoulder button holder along with 2 square shoulder buttons for the left side controller. This design is not very sturdy and it is overly complicated. Not recommended.
+
+### shoulder-buttons-left-v2 [Status: success (up to date)]
+
+This contains a 2 piece shoulder button holder along with 2 square shoulder buttons for the left side controller. This design is sturdier than v1. This does not fit the Nintendo 3DS shoulder buttons.
