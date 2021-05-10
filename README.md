@@ -45,3 +45,7 @@ This contains a 2 piece shoulder button holder along with 2 square shoulder butt
 ### shoulder-buttons-left-v2 [Status: success (up to date)]
 
 This contains a 2 piece shoulder button holder along with 2 square shoulder buttons for the left side controller. This design is sturdier than v1. This does not fit the Nintendo 3DS shoulder buttons.
+
+### controller-chassis-mount-left [Status: WIP]
+
+This is basically thumbstick-v2, dpad\_tactile, and shoulder-buttons-left-v2 fused together into one model. This will have attachments to be fitted onto a chassis and then put inside an outer enclosure.
