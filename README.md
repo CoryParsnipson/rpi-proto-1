@@ -28,7 +28,11 @@ This is a small test swatch for metal dome switch PCB trace. This also contains 
 
 ### dpad\_tactile [Status: success (up to date)]
 
-This is a 3 piece jig for holding OMRON B3F-1000 tactile switches into a dpad configuration. A 2015 new nintendo 3ds (non XL) dpad and silicon mask go on top of the cover and underneath the dpad holder.
+This is a 3 piece jig for holding OMRON B3F-1000 tactile switches into a dpad configuration. A 2015 new nintendo 3ds XL dpad and silicon mask go on top of the cover and underneath the dpad holder.
+
+### abxy\_tactile [Status: success (up to date)]
+
+This is a 3 piece jig for holding OMRON B3F-1000 tactile switches into an ABXY button cross configuration. This is sized specifically for a 2015+ new Nintendo 3DS XL dpad and silicon mask.
 
 ### thumbstick [Status: obsolete]
 
