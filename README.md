@@ -53,3 +53,7 @@ This contains a 2 piece shoulder button holder along with 2 square shoulder butt
 ### controller-chassis-mount-left [Status: success (up to date)]
 
 This is basically thumbstick-v2, dpad\_tactile, and shoulder-buttons-left-v2 fused together into one model. This will have attachments to be fitted onto a chassis and then put inside an outer enclosure. The L1 and L2 shoulder buttons should be printed with the ironing setting enabled for best effect. The select button holder in this is barely functional. This will be improved in the next version.
+
+### controller-chassis-mount-right [Status: success (up to date)]
+
+This is the right controller half, meant to hold a thumbstick, ABXY buttons, and shoulder buttons in place. This isn't a symmetric version of the left controller because the thumbstick only comes in one orientation so the breakout board is mounted vertically instead of horizontally like in the left side. This makes the right controller frame slightly wider than the left side.
