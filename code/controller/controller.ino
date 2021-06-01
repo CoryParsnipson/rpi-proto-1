@@ -2,7 +2,8 @@
 #include <HID-Settings.h>
 
 const int REFRESH_INTERVAL = 1000;
-const bool ENABLE_SERIAL = true;
+const bool ENABLE_SERIAL = false;
+const char* msg = new char[80];
 
 const int NUM_ROWS = 4;
 const int NUM_COLS = 4;
@@ -21,7 +22,11 @@ void setup() {
   
   if (ENABLE_SERIAL) {
     Serial.begin(9600);
-    Serial.println("Hello World!");  
+    while (!Serial) {
+      ; // wait for serial port to connect. Needed for native USB
+    }
+    
+    Serial.println("Serial monitor enabled");
   }
 
   Gamepad.begin();
@@ -48,6 +53,11 @@ void loop() {
       if (button_state) {
         Gamepad.press(current_button);
         is_pressed = true;
+
+        if (ENABLE_SERIAL) {
+          sprintf(msg, "Row %i, Col %i detected\n", row, col);
+          Serial.print(msg);
+        }
       } else {
         Gamepad.release(current_button);
       }
