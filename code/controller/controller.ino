@@ -9,14 +9,16 @@ const int NUM_ROWS = 4;
 const int NUM_COLS = 4;
 
 const int ROW_PINS[NUM_ROWS] = { 7, 8, 10, 16 };
-const int COL_PINS[NUM_COLS] = { 2, 4, 14, 15 };
+const int COL_PINS[NUM_COLS] = { 3, 4, 14, 15 };
 
-const int pinLXAxis = A1;
-const int pinLYAxis = A0;
+const int pinLXAxis = A0;
+const int pinLYAxis = A1;
 
 void setup() {
   digitalWrite(pinLXAxis, LOW);
   digitalWrite(pinLYAxis, LOW);
+
+  pinMode(2, INPUT_PULLUP); // goes to mosfet gate off for left thumbstick button
     
   reset();
   
@@ -68,18 +70,18 @@ void loop() {
 
   // analog axes
   int readX = analogRead(pinLXAxis); // store in temporary variables to use in constrain()
-  int readY = analogRead(pinLYAxis);
+  int readY = analogRead(pinLYAxis); 
 
-  const int XMIN = 200, XMAX = 880;
-  const int YMIN = 125, YMAX = 835;
+  const int XMIN = 160, XMAX = 830;
+  const int YMIN = 125, YMAX = 815;
 
   // clamp values to observed joystick values
   readX = constrain(readX, XMIN, XMAX);
   readY = constrain(readY, YMIN, YMAX);
     
   Gamepad.xAxis(map(readX, XMIN, XMAX, -32767, 32767)); 
-  Gamepad.yAxis(map(readY, YMIN, YMAX, 32767, -32767)); // flip Y axis because I have it oriented upside-down
-
+  Gamepad.yAxis(map(readY, YMIN, YMAX, 32767, -32767)); // flip Y axis because of the physical orientation of thumbstick
+ 
   Gamepad.write();
 
   delayMicroseconds(REFRESH_INTERVAL);
