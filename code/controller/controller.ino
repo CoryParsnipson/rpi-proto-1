@@ -11,6 +11,9 @@ const int NUM_COLS = 4;
 const int ROW_PINS[NUM_ROWS] = { 7, 8, 10, 16 };
 const int COL_PINS[NUM_COLS] = { 3, 4, 14, 15 };
 
+const int LEFT_THUMBSTICK_BUTTON_PIN = 9;
+const int RIGHT_THUMBSTICK_BUTTON_PIN = 3;
+
 const int pinLXAxis = A0;
 const int pinLYAxis = A1;
 
@@ -18,7 +21,8 @@ void setup() {
   digitalWrite(pinLXAxis, LOW);
   digitalWrite(pinLYAxis, LOW);
 
-  pinMode(2, INPUT_PULLUP); // goes to mosfet gate off for left thumbstick button
+  // thumbstick buttons are not part of key matrix
+  pinMode(LEFT_THUMBSTICK_BUTTON_PIN, INPUT_PULLUP);
     
   reset();
   
@@ -49,7 +53,7 @@ void loop() {
       pinMode(row, INPUT_PULLUP);
       bool button_state = !digitalRead(row);
       pinMode(row, OUTPUT);
-      digitalWrite(row, LOW); // ground potential before disconnecting because of the MOSFET attached
+      digitalWrite(row, LOW); // discharge any potential floating nodes
       pinMode(row, INPUT);
       
       if (button_state) {
@@ -66,6 +70,13 @@ void loop() {
     }
 
     pinMode(col, INPUT);
+  }
+
+  // left thumbstick button polling
+  if (!digitalRead(LEFT_THUMBSTICK_BUTTON_PIN)) {
+    Gamepad.press(NUM_ROWS * NUM_COLS + 1);
+  } else {
+    Gamepad.release(NUM_ROWS * NUM_COLS + 1);
   }
 
   // analog axes
