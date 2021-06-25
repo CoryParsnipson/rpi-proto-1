@@ -62,6 +62,6 @@ This is the right controller half, meant to hold a thumbstick, ABXY buttons, and
 
 This is the main parts to hold everything together. So far only consists of a part that screws into the screen and holds the two controller halves. This model can be used with no problems, but v2 is better.
 
-### chassis-v2 [Status: WIP]
+### chassis-v2 [Status: success (up to date)]
 
-This is a re-make with reinforced sides so the controller hooks bend less.
+This is a re-make with reinforced sides so the controller hooks bend less. The two protoboard holders has been changed to one protoboard holder and one USB Hub holder. This version also has speaker holders and screw holes for the front enclosure to screw into it.
