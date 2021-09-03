@@ -380,3 +380,27 @@ write_block_data () {
   i2c_write $PARAMETER_ADDR $WRITE_DATA $WRITE_LENGTH
   write_block_data_checksum $CHECKSUM
 }
+
+get_battery_percentage () {
+  printf "%d\n" $(i2c_read 0x1C w)
+}
+
+get_temperature () {
+  local UNIT="${1:-f}" # select Fahrenheit (f), Celsius (c), or Kelvin (k)
+
+  TEMP=$(i2c_read 0x02 w)
+  CONVERTED_TEMP=0
+
+  case $UNIT in
+    "k") CONVERTED_TEMP=$(( TEMP / 10 )) ;;
+    "c") CONVERTED_TEMP=$(( (TEMP / 10) - 273 )) ;;
+    *)   CONVERTED_TEMP=$(( ((TEMP / 10) - 273) * 9 / 5 + 32 )) ;;
+  esac
+
+  echo $CONVERTED_TEMP
+}
+
+get_voltage () {
+  MILLIVOLTS=$(i2c_read 0x04 w)
+  echo $(( MILLIVOLTS / 1000 ))
+}
