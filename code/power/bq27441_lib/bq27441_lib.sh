@@ -9,6 +9,9 @@ then
   echo "  DEVICE_ID - I2C bus address of the device to read from\n"
 fi
 
+EXT_MODE=false
+EXT_MODE_SEALED=0
+
 i2c_read () {
   local ADDR=$1
   local MODE="${2:-w}"
@@ -26,7 +29,7 @@ i2c_write () {
 
 wait_for_cfgupdate () {
   local TRIES=0
-  local MAX_TRIES=3
+  local MAX_TRIES=5
   local SETCFG_BIT=0
   local IS_DONE=0
   local DESIRED_CFGUPDATE_VAL=${1:-1}
@@ -47,10 +50,10 @@ wait_for_cfgupdate () {
   
   if (( IS_DONE == 0 ))
   then
-    echo "Timeout waiting for SETCFGUPDATE to be set."
-    echo 1
+    echo "Timeout waiting for SETCFGUPDATE to be set." >&2
+    return 1
   else
-    echo 0
+    return 0
   fi
 }
 
@@ -122,28 +125,92 @@ is_sealed () {
   echo $(( SEALED >> 13 ))
 }
 
-## enter config update mode for using extended commands
-enter_config_update_mode () {
+soft_reset () {
+  i2c_write 0x00 0x0042 w
+}
+
+enter_extended_mode () {
+  if $EXT_MODE
+  then
+    echo "Already in extended mode."
+    return 0
+  fi
+
+  EXT_MODE_SEALED=$(is_sealed)
+  if [ -n $EXT_MODE_SEALED ]
+  then
+    echo "Unsealing to enter extended mode."
+    unseal > /dev/null
+
+    if (( is_sealed == 1 ))
+    then
+      echo "Failed to unseal device" >&2
+      read_control_status true
+      return 1
+    fi
+  fi
+
+  # enter CFGUPDATE mode
   i2c_write 0x00 0x0013 w
   
   # wait for the cfgupdate flag to be set
-  CFGUPDATE=$(wait_for_cfgupdate)
-  if [ -n $CFGUPDATE ]
+  wait_for_cfgupdate
+  local CFGUPDATE=$?
+  if (( CFGUPDATE != 0 ))
   then
     return $CFGUPDATE
   fi
 
   # enable block data memory control
   i2c_write 0x61 0x00
+
+  EXT_MODE=true
+  return 0
 }
 
-soft_reset () {
-  i2c_write 0x00 0x0042 w
-}
+exit_extended_mode () {
+  if ! $EXT_MODE
+  then
+    echo "Not in extended mode. Exit aborted."
+    return 0
+  fi
 
-exit_config_update_mode () {
   soft_reset
-  wait_for_cfgupdate > /dev/null
+
+  wait_for_cfgupdate 0
+  local CFGUPDATE=$?
+  if (( CFGUPDATE != 0 ))
+  then
+    echo "Failed to exit config update mode" >&2
+    echo $CFGUPDATE
+  fi
+
+  # reseal if sealed
+  if (( EXT_MODE_SEALED != 0 ))
+  then
+    seal > /dev/null
+
+    local SEALED_CHECK=$(is_sealed)
+    if (( SEALED_CHECK == 0 ))
+    then
+      echo "Failed to seal device" >&2
+      read_control_status true
+      return 1
+    fi
+  fi
+
+  EXT_MODE=false
+  echo "Exiting extended mode."
+}
+
+read_block_data_checksum () {
+  if ! $EXT_MODE
+  then
+    echo "Can't read_block_data_checksum() while not in extended mode." >&2
+  fi
+
+  CHECKSUM=$(i2c_read 0x60 b)
+  echo $CHECKSUM
 }
 
 read_block_data () {
@@ -161,25 +228,22 @@ read_block_data () {
 
   if (( DATA_LENGTH_IN_BYTES > 2 ))
   then
-    echo "FATAL in read_block_data(): Reading parameter longer than 2 bytes is unsupported."
-    return
+    echo "FATAL in read_block_data(): Reading parameter longer than 2 bytes is unsupported." >&2
+    return 1
   fi
 
-  # unseal if sealed
-  local SEALED=$(is_sealed)
-  if [ -n $SEALED ]
+  if ! $EXT_MODE
   then
-    unseal > /dev/null
-
-    if (( is_sealed == 1 ))
-    then
-      echo "Failed to unseal device"
-      read_control_status true
-      return
-    fi
+    echo "Can't read_block_data() while not in extended mode." >&2
   fi
 
-  enter_config_update_mode
+  local RES=$?
+  if (( RES != 0 ))
+  then
+    return $RES
+  fi
+
+  # set subclass and block offset
   i2c_write 0x3E $SUBCLASS
   i2c_write 0x3F $BLOCK_OFFSET
 
@@ -187,14 +251,6 @@ read_block_data () {
 
   local PARAMETER_ADDR=$(( 0x40 + (PARAMETER_OFFSET % 32) ))
   PARAMETER_DATA=$(i2c_read $PARAMETER_ADDR $READ_LENGTH)
-
-  exit_config_update_mode
-
-  # reseal if sealed
-  if [ -n $SEALED ]
-  then
-    seal > /dev/null
-  fi
 
   # if read_length > 1, need to fix endianness
   FIXED_PDATA=$PARAMETER_DATA
