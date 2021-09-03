@@ -92,7 +92,46 @@ read_control_status () {
     printf "Board Calibration Routine Active: %s\n" $BCA
     printf "Qmax updated: %s\n" $QMAXUP
     printf "Resistance Updated: %s\n" $RESUP
-    
+    echo ""
+  fi
+}
+
+read_flags () {
+  local VERBOSE="${1:-false}"
+
+  FLAGS=$(i2c_read 0x06 w)
+
+  if ! $VERBOSE
+  then
+    echo $FLAGS
+  else
+    if (( FLAGS & 0x0001 )); then DISCHARGING="true"  ; else DISCHARGING="false"  ; fi
+    if (( FLAGS & 0x0002 )); then SOCF="true"         ; else SOCF="false"         ; fi
+    if (( FLAGS & 0x0004 )); then SOC1="true"         ; else SOC1="false"         ; fi
+    if (( FLAGS & 0x0008 )); then BAT_DET="true"      ; else BAT_DET="false"      ; fi
+
+    if (( FLAGS & 0x0010 )); then CFGUPDATE="true"    ; else CFGUPDATE="false"    ; fi
+    if (( FLAGS & 0x0020 )); then ITPOR="true"        ; else ITPOR="false"        ; fi
+    if (( FLAGS & 0x0080 )); then OCVTAKEN="true"     ; else OCVTAKEN="false"     ; fi
+
+    if (( FLAGS & 0x0100 )); then FASTCHARGING="true" ; else FASTCHARGING="false" ; fi
+    if (( FLAGS & 0x0200 )); then FULLCHARGE="true"   ; else FULLCHARGE="false"   ; fi
+
+    if (( FLAGS & 0x4000 )); then UNDERTEMP="true" ; else UNDERTEMP="false"; fi
+    if (( FLAGS & 0x8000 )); then OVERTEMP="true" ; else OVERTEMP="false"; fi
+
+    printf "Flags Register: 0x%04x\n" $FLAGS
+    echo "------------------------"
+    printf "OVER TEMP DETECTED: %s\n" $OVERTEMP
+    printf "UNDER TEMP DETECTED: %s\n" $UNDERTEMP
+    printf "FULL CHARGE DETECTED: %s\n" $FULLCHARGE
+    printf "FAST CHARGING ENABLED: %s\n" $FASTCHARGING
+    printf "OCV MEASUREMENT TAKEN: %s\n" $OCVTAKEN
+    printf "POR OR RESET OCCURRED: %s\n" $ITPOR
+    printf "CFG UPDATE MODE: %s\n" $CFGUPDATE
+    printf "BATTERY INSERTION DETECTED: %s\n" $BAT_DET
+    printf "STATE OF CHARGE < THRESHOLD 1: %s\n" $SOC1
+    printf "STATE OF CHARGE < THRESHOLD F: %s\n" $SOCF
     echo ""
   fi
 }
@@ -213,12 +252,21 @@ read_block_data_checksum () {
   echo $CHECKSUM
 }
 
+write_block_data_checksum () {
+  if ! $EXT_MODE
+  then
+    echo "Can't write_block_data_checksum() while not in extended mode." >&2
+  fi
+
+  i2c_write 0x60 $1 b
+}
+
 read_block_data () {
   local SUBCLASS="${1:-0x52}" # default to "State" subclass
   local PARAMETER_OFFSET="$2"
   local DATA_LENGTH_IN_BYTES="${3:-1}"
 
-  local BLOCK_OFFSET=$(( $PARAMETER_OFFSET / 32 ))
+  local BLOCK_OFFSET=$(( PARAMETER_OFFSET / 32 ))
   local READ_LENGTH=b
   
   if (( DATA_LENGTH_IN_BYTES == 2 ))
@@ -235,19 +283,12 @@ read_block_data () {
   if ! $EXT_MODE
   then
     echo "Can't read_block_data() while not in extended mode." >&2
-  fi
-
-  local RES=$?
-  if (( RES != 0 ))
-  then
-    return $RES
+    return 1
   fi
 
   # set subclass and block offset
   i2c_write 0x3E $SUBCLASS
   i2c_write 0x3F $BLOCK_OFFSET
-
-  # TODO: validate checksum
 
   local PARAMETER_ADDR=$(( 0x40 + (PARAMETER_OFFSET % 32) ))
   PARAMETER_DATA=$(i2c_read $PARAMETER_ADDR $READ_LENGTH)
@@ -261,4 +302,81 @@ read_block_data () {
   fi
 
   echo $FIXED_PDATA
+  return 0
+}
+
+compute_block_data_checksum () {
+  local SUBCLASS="${1:-0x52}" # default to "State" subclass
+  local BLOCK_OFFSET="${2:-0}"
+
+  local MAX_BLOCK_OFFSET=31
+
+  if ! $EXT_MODE
+  then
+    echo "Can't compute_block_data_checksum() while not in extended mode." >&2
+  fi
+
+  local OFFSET=0
+  local SUM=0
+
+  while (( OFFSET <= MAX_BLOCK_OFFSET ))
+  do
+    DATA=$(read_block_data $SUBCLASS $OFFSET 1)
+    SUM=$(( (SUM + DATA) % 256 ))
+    OFFSET=$(( OFFSET + 1 ))
+  done
+
+  CHECKSUM=$(( 255 - SUM ))
+}
+
+write_block_data () {
+  local SUBCLASS="${1:-0x52}" # default to "State" subclass
+  local PARAMETER_OFFSET="$2"
+  local WRITE_DATA=$3
+  local DATA_LENGTH_IN_BYTES="${4:-1}"
+
+  local BLOCK_OFFSET=$(( PARAMETER_OFFSET / 32 ))
+  local WRITE_LENGTH=b
+
+  if (( DATA_LENGTH_IN_BYTES == 2 ))
+  then
+    WRITE_LENGTH=w
+
+    # need to reverse endianness of write data
+    local TEMP=$(( WRITE_DATA & 0xFF ))
+    WRITE_DATA=$(( (WRITE_DATA >> 8) | (TEMP << 8) ))
+  fi
+
+  if (( DATA_LENGTH_IN_BYTES > 2 ))
+  then
+    echo "FATAL in write_block_data(): Writing parameter longer than 2 bytes is unsupported." >&2
+    return 1
+  fi
+
+  if [ -z $WRITE_DATA ]
+  then
+    echo "FATAL in write_block_data(): Need to supply write data." >&2
+    echo "Supplied write data: " $WRITE_DATA >&2
+  fi
+
+  if ! $EXT_MODE
+  then
+    echo "Can't read_block_data() while not in extended mode." >&2
+    return 1
+  fi
+
+  # set subclass and block offset
+  i2c_write 0x3E $SUBCLASS
+  i2c_write 0x3F $BLOCK_OFFSET
+
+  local PARAMETER_ADDR=$(( 0x40 + (PARAMETER_OFFSET % 32) ))
+  OLD_DATA=$(read_block_data $SUBCLASS $PARAMETER_OFFSET $DATA_LENGTH_IN_BYTES)
+  CHECKSUM=$(read_block_data_checksum)
+
+  # need to update the checksum with the delta of the new data
+  CHECKSUM=$(( (255 - CHECKSUM - (OLD_DATA & 0x00FF) - ((OLD_DATA >> 8) & 0x00FF)) & 0x00FF ))
+  CHECKSUM=$(( 255 - ((CHECKSUM + ((WRITE_DATA >> 8) & 0x00FF) + (WRITE_DATA & 0x00FF)) & 0x00FF) ))
+
+  i2c_write $PARAMETER_ADDR $WRITE_DATA $WRITE_LENGTH
+  write_block_data_checksum $CHECKSUM
 }
