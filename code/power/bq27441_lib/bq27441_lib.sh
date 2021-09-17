@@ -136,6 +136,36 @@ read_flags () {
   fi
 }
 
+read_opconfig () {
+  local VERBOSE="${1:-false}"
+
+  OPCONFIG=$(i2c_read 0x3A w)
+
+  if ! $VERBOSE
+  then
+    echo $OPCONFIG
+  else
+    if (( OPCONFIG & 0x0001 )); then TEMPS="FROM HOST"                   ; else TEMPS="INTERNAL"            ; fi
+    if (( OPCONFIG & 0x0004 )); then BATLOWEN="INTERRUPT ON BATTERY LOW" ; else BATLOWEN="INTERRUPT ON SOC" ; fi
+    if (( OPCONFIG & 0x0010 )); then RMFCC="true"                        ; else RMFCC="false"               ; fi
+    if (( OPCONFIG & 0x0020 )); then SLEEP="true"                        ; else SLEEP="false"               ; fi
+    if (( OPCONFIG & 0x0800 )); then GPIOPOL="ACTIVE HIGH"               ; else GPIOPOL="ACTIVE LOW"        ; fi
+    if (( OPCONFIG & 0x1000 )); then BI_PU_EN="Pull up enabled"          ; else BI_PU_EN="None"             ; fi
+    if (( OPCONFIG & 0x2000 )); then BIE="AUTOMATIC"                     ; else BIE="MANUAL"                ; fi
+
+    printf "OpConfig Register: 0x%04x\n" $OPCONFIG
+    echo "------------------------"
+    printf "TEMPERATURE SOURCE: %s\n" "$TEMPS"
+    printf "INTERRUPT CONFIG (BATLOWEN): %s\n" "$BATLOWEN"
+    printf "RMFCC: %s\n" "$RMFCC"
+    printf "ENTER SLEEP ENABLED: %s\n" "$SLEEP"
+    printf "GPIOPOL: %s\n" "$GPIOPOL"
+    printf "BIE PULLUP ENABLE: %s\n" "$BI_PU_EN"
+    printf "BATTERY INSERTION ENABLE: %s\n" "$BIE"
+    echo ""
+  fi
+}
+
 ## unseal the fuel gauge; returns control register status afterwards
 unseal () {
   local VERBOSE="${1:-false}"
@@ -401,6 +431,13 @@ get_temperature () {
 }
 
 get_voltage () {
+  SCALE=3
+
   MILLIVOLTS=$(i2c_read 0x04 w)
-  echo $(( MILLIVOLTS / 1000 ))
+  MILLIVOLTS=$(printf "%d\n" $MILLIVOLTS)
+
+  PARAM="scale=$SCALE; $MILLIVOLTS / 1000"
+  VOLTS=$(bc <<< $PARAM)
+
+  printf "%0.${SCALE}f\n" $VOLTS
 }
