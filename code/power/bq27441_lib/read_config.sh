@@ -19,5 +19,8 @@ printf "TERMINATE VOLTAGE: %d mV\n" $BLOCKDATA
 BLOCKDATA=$(read_block_data 0x52 27 2)
 printf "TAPER RATE: %d [0.1 Hr rate]\n" $BLOCKDATA
 
+BLOCKDATA=$(read_block_data 0x52 26 1)
+printf "SOCI DELTA: %d percent\n" $BLOCKDATA
+
 exit_extended_mode
 read_control_status true
