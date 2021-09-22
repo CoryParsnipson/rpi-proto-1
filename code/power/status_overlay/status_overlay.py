@@ -10,10 +10,15 @@ import RPi.GPIO as GPIO
 __ORIGINAL_SIGINT__=None
 
 PNGVIEW_PATH="pngview"
+IMAGE_PATH="images/"
+FUEL_GAUGE_SCRIPT_PATH=""
 BATTERY_GPOUT_PIN=29 # board pin 29 is GPIO5
 BATTERY_POWER_PIN=36 # board pin 36 is GPIO16 (tied to GPIO6 in hardware)
 
 
+# -----------------------------------------------------------------------------
+# Graphical utilites
+# -----------------------------------------------------------------------------
 def pngview(pngfile, **kwargs):
     """ Call pngview to display an image on the screen. Returns a process id
         that the pngview call is running in. Use kwargs to set parameters:
@@ -40,6 +45,22 @@ def draw_status_hud():
     pass
 
 
+# -----------------------------------------------------------------------------
+# Battery functions
+# -----------------------------------------------------------------------------
+def get_state_of_charge():
+    """ Call the bq27441 library to get the state of charge. This will
+        return a string containing a base ten integer value between 0
+        and 100 representing a percentage of max battery charge capacity.
+    """
+    #fuel_gauge_call()
+    #subprocess.check_output()
+    pass
+
+
+# -----------------------------------------------------------------------------
+# GPIO interrupt handling
+# -----------------------------------------------------------------------------
 def gpio_setup():
     """ Setup for all GPIO pins
     """

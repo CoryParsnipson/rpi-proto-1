@@ -33,16 +33,17 @@ Install RPI.GPIO.
   $ sudo apt-get install python3-rpi.gpio
 ```
 
-Install PyGObject and pycairo for the GUI part.
+Install pngview.
 
 ```
-  $ sudo apt-get install python3-gi gobject-introspection gir1.2-gtk-3.0
-  $ pip3 install pycairo
-  $ pip3 install PyGObject
+  $ git clone --depth 1 https://github.com/AndrewFromMelbourne/raspidmx.git
+  $ cd raspidmx/
+  $ make -j4
+  $ sudo cp pngview/pngview /usr/local/bin/
 ```
 
 References
 ==========
 
 [1] https://sourceforge.net/p/raspberry-gpio-python/wiki/Home/ -  RPi.GPIO documentation and examples
-[2] 
+[2] https://github.com/d-rez/gbz\_overlay - Reference for making an RPi graphical overlay
