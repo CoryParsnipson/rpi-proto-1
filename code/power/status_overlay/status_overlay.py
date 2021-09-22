@@ -11,7 +11,21 @@ __ORIGINAL_SIGINT__=None
 
 PNGVIEW_PATH="pngview"
 IMAGE_PATH="images/"
-FUEL_GAUGE_SCRIPT_PATH=""
+LIB_PATH="lib/"
+
+FUEL_GAUGE_SCRIPT_PATH=LIB_PATH + "bq27441_lib/"
+FUEL_GAUGE_I2C_BUS_ID=1
+FUEL_GAUGE_I2C_DEVICE_ID=0x55
+FUEL_GAUGE_COMMAND=' '.join([
+    "bash",
+    "-c",
+    "'.",
+    FUEL_GAUGE_SCRIPT_PATH + "bq27441_lib.sh",
+    str(FUEL_GAUGE_I2C_BUS_ID),
+    str(FUEL_GAUGE_I2C_DEVICE_ID),
+    ";"
+]) + " "
+
 BATTERY_GPOUT_PIN=29 # board pin 29 is GPIO5
 BATTERY_POWER_PIN=36 # board pin 36 is GPIO16 (tied to GPIO6 in hardware)
 
@@ -48,14 +62,20 @@ def draw_status_hud():
 # -----------------------------------------------------------------------------
 # Battery functions
 # -----------------------------------------------------------------------------
+def fuel_gauge_command(func):
+    """ Construct the bash script command line string to call the function
+        name provided by `func`.
+    """
+    return FUEL_GAUGE_COMMAND + func + "'"
+
+
 def get_state_of_charge():
     """ Call the bq27441 library to get the state of charge. This will
         return a string containing a base ten integer value between 0
         and 100 representing a percentage of max battery charge capacity.
     """
-    #fuel_gauge_call()
-    #subprocess.check_output()
-    pass
+    result = subprocess.run(fuel_gauge_command("get_battery_percentage"), capture_output=True, shell=True)
+    return int(result.stdout.decode('utf-8'))
 
 
 # -----------------------------------------------------------------------------
