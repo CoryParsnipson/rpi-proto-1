@@ -72,6 +72,7 @@ def pngview(draw_id, pngfile, **kwargs):
     pngview_call.append(pngfile)
 
     pid = subprocess.Popen(pngview_call)
+    time.sleep(0.025) # this is a hack to prevent flickering
     if draw_id in PNGVIEW_PROCESSES:
         PNGVIEW_PROCESSES[draw_id].kill()
     PNGVIEW_PROCESSES[draw_id] = pid
