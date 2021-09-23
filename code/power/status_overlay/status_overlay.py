@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import re
 import signal
 import subprocess
 import sys
@@ -9,9 +10,10 @@ import RPi.GPIO as GPIO
 
 __ORIGINAL_SIGINT__=None
 
-PNGVIEW_PATH="pngview"
 IMAGE_PATH="images/"
 LIB_PATH="lib/"
+
+PNGVIEW_PATH="pngview"
 
 FUEL_GAUGE_SCRIPT_PATH=LIB_PATH + "bq27441_lib/"
 FUEL_GAUGE_I2C_BUS_ID=1
@@ -51,6 +53,17 @@ def pngview(pngfile, **kwargs):
     pngview_call.append(pngfile)
 
     return subprocess.Popen(pngview_call)
+
+
+def get_screen_resolution(display_id=0):
+    """ Returns a pair of integers with the screen resolution of the specified
+        display. The first coordinate is 'x' (screen width) and the second is
+        'y' (screen height).
+    """
+    results = subprocess.run(["tvservice", "-s", "-v", str(display_id)], capture_output=True)
+    resolution = re.search("(\d{2,}x\d{2,})", results.stdout.decode('utf-8'))
+
+    return [int(x) for x in resolution[0].split("x")]
 
 
 def draw_status_hud():
