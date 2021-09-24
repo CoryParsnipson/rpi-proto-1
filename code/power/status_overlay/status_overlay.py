@@ -22,6 +22,7 @@ DIMENSION_CACHE = {}
 LAYER_DEFAULT = 15000
 LAYER_BATTERY = LAYER_DEFAULT
 LAYER_NUMBER = LAYER_DEFAULT
+LAYER_BACKDROP = LAYER_DEFAULT - 10
 DISPLAY_ID = 0
 
 FUEL_GAUGE_SCRIPT_PATH = LIB_PATH + "bq27441_lib/"
@@ -140,6 +141,13 @@ def draw_hud(**kwargs):
     h_cursor = screen[0]
 
     try:
+        # draw backdrop
+        backdrop_image_path = IMAGE_PATH + "backdrop.png"
+        backdrop_image_dimensions = png_dimensions(backdrop_image_path)
+        backdrop_pos = (screen[0] - backdrop_image_dimensions[0], 0)
+
+        pngview("backdrop", backdrop_image_path, d=DISPLAY_ID, l=LAYER_BACKDROP, x=backdrop_pos[0], y=backdrop_pos[1])
+
         # draw battery in upper right corner
         battery_image_path = charge_to_img_path(kwargs['battery'], kwargs['charging'])
         battery_image_dimensions = png_dimensions(battery_image_path)
@@ -279,7 +287,7 @@ def handle_power_button_press(channel):
 
 if __name__ == '__main__':
     gpio_setup()
-    draw_hud()
+    draw_hud(battery=100)
 
     while True:
         time.sleep(60)
