@@ -20,8 +20,8 @@ PNGVIEW_PATH = "pngview"
 PNGVIEW_PROCESSES = {}
 DIMENSION_CACHE = {}
 LAYER_DEFAULT = 15000
-LAYER_BATTERY = LAYER_DEFAULT
-LAYER_NUMBER = LAYER_DEFAULT
+LAYER_BATTERY = LAYER_DEFAULT + 5
+LAYER_NUMBER = LAYER_DEFAULT + 10
 LAYER_BACKDROP = LAYER_DEFAULT - 10
 DISPLAY_ID = 0
 
@@ -74,7 +74,11 @@ def pngview(draw_id, pngfile, **kwargs):
     if 'n' not in kwargs:
         kwargs['n'] = ""
 
-    pngview_call = [val for pair in zip(["-" + str(k) for k in kwargs.keys()], [None if not str(v) else str(v) for v in kwargs.values()]) for val in pair]
+    pngview_call = [val for pair in zip(
+        ["-" + str(k) for k in kwargs.keys()],
+        [None if not str(v) else str(v) for v in kwargs.values()]
+    ) for val in pair]
+
     pngview_call.insert(0, PNGVIEW_PATH)
     pngview_call.append(pngfile)
 
@@ -130,12 +134,13 @@ def draw_hud(**kwargs):
     """ Make all pngview calls to draw the status overlay
 
         battery - integer with remaining battery charge
-        charging - boolean with whether or not the device is charging
+        is_charging - boolean with whether or not the device is charging
     """
+
     if 'battery' not in kwargs:
         kwargs['battery'] = 0
-    if 'charging' not in kwargs:
-        kwargs['charging'] = False
+    if 'is_charging' not in kwargs:
+        kwargs['is_charging'] = False
 
     H_PADDING = 2
     V_PADDING = 2
@@ -157,7 +162,7 @@ def draw_hud(**kwargs):
         pngview("backdrop", backdrop_image_path, d=DISPLAY_ID, l=LAYER_BACKDROP, x=backdrop_pos[0], y=backdrop_pos[1])
 
         # draw battery in upper right corner
-        battery_image_path = charge_to_img_path(kwargs['battery'], kwargs['charging'])
+        battery_image_path = charge_to_img_path(kwargs['battery'], kwargs['is_charging'])
         battery_image_dimensions = png_dimensions(battery_image_path)
 
         h_cursor = h_cursor - battery_image_dimensions[0] - H_PADDING
@@ -223,6 +228,15 @@ def get_state_of_charge():
     return int(result.stdout.decode('utf-8'))
 
 
+def is_discharging():
+    """ Call the bq27441 library to get whether or not the device is discharging
+        battery. This will be True if the battery power is being used or False
+        if the wall power is plugged in.
+    """
+    result = subprocess.run(fuel_gauge_command("is_discharging"), capture_output=True, shell=True)
+    return result.stdout.decode('utf-8').strip() == "True"
+
+
 def charge_to_img_path(charge, is_charging = False):
     """ Given a percentage of remaining battery life, return the corresponding
         image file.
@@ -272,7 +286,14 @@ def on_exit(signum, frame):
     # restore the original signal handler as otherwise evil things will happen
     # in raw_input when CTRL+C is pressed, and our signal handler is not re-entrant
     signal.signal(signal.SIGINT, __ORIGINAL_SIGINT__)
+
+    # release all the RPi.GPIO pins
     GPIO.cleanup()
+
+    # kill all pngview processes
+    for v in PNGVIEW_PROCESSES.values():
+        v.kill()
+
     sys.exit(0)
 
 
@@ -280,7 +301,7 @@ def handle_battery_charge_state_change(channel):
     """ Update the status overlay with new battery life percentage
         information.
     """
-    print("SOC event detected!")
+    draw_hud(battery=get_state_of_charge(), is_charging=(not is_discharging()))
 
 
 def handle_power_button_press(channel):
@@ -295,16 +316,7 @@ def handle_power_button_press(channel):
 
 if __name__ == '__main__':
     gpio_setup()
-    draw_hud(battery=100)
+    draw_hud(battery=get_state_of_charge(), is_charging=(not is_discharging()))
 
     while True:
         time.sleep(60)
-
-    #battery = 100
-    #charging = False
-    #while True:
-    #    draw_hud(battery=battery, charging=charging)
-    #    if abs((battery - 3) % 100) > battery:
-    #        charging = ~charging
-    #    battery = abs((battery - 3) % 100)
-    #    time.sleep(2)

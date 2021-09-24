@@ -415,6 +415,17 @@ get_battery_percentage () {
   printf "%d\n" $(i2c_read 0x1C w)
 }
 
+is_discharging () {
+  FLAGS=$(read_flags)
+
+  if (( FLAGS & 0x0001 == 1 ))
+  then
+    echo "True"
+  else
+    echo "False"
+  fi
+}
+
 get_temperature () {
   local UNIT="${1:-f}" # select Fahrenheit (f), Celsius (c), or Kelvin (k)
 
