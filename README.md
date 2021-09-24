@@ -1,5 +1,6 @@
 # rpi-proto-1
-3D printable models for RPI shell prototype
+
+This repository contains all (hw, fw, sw) resources for an RPI shell prototype.
 
 # About
 
