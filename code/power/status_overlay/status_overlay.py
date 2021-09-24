@@ -68,9 +68,17 @@ def pngview(draw_id, pngfile, **kwargs):
         -t - timeout in ms
         -n - non-interactive mode
     """
-    pngview_call = [val for pair in zip(["-" + str(k) for k in kwargs.keys()], [str(v) for v in kwargs.values()]) for val in pair]
+    if 'b' not in kwargs:
+        kwargs['b'] = 0
+
+    if 'n' not in kwargs:
+        kwargs['n'] = ""
+
+    pngview_call = [val for pair in zip(["-" + str(k) for k in kwargs.keys()], [None if not str(v) else str(v) for v in kwargs.values()]) for val in pair]
     pngview_call.insert(0, PNGVIEW_PATH)
     pngview_call.append(pngfile)
+
+    pngview_call = filter((None).__ne__, pngview_call)
 
     pid = subprocess.Popen(pngview_call)
     time.sleep(0.025) # this is a hack to prevent flickering
