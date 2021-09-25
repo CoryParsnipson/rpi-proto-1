@@ -411,7 +411,7 @@ def handle_power_button_press(channel):
         device in hardware.
     """
     global __LAST_POWER_BUTTON_PRESSED_TIME__
-    time.sleep(0.075) # debounce 100ms
+    time.sleep(0.075) # debounce
 
     if GPIO.input(CONFIG["BATTERY_POWER_PIN"]):
         # input is high, button was released
