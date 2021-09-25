@@ -12,38 +12,44 @@ import time
 
 import RPi.GPIO as GPIO
 
-__ORIGINAL_SIGINT__ = None
-__LAST_POWER_BUTTON_PRESSED_TIME__ = None
 
-__IS_VISIBLE__ = True
+CONFIG = {}
 
-IMAGE_PATH = "images/"
-LIB_PATH = "lib/"
+CONFIG["IMAGE_PATH"] = "images/"
+CONFIG["LIB_PATH"] = "lib/"
+CONFIG["PNGVIEW_PATH"] = "pngview"
 
-PNGVIEW_PATH = "pngview"
-PNGVIEW_PROCESSES = {}
-DIMENSION_CACHE = {}
-LAYER_DEFAULT = 15000
-LAYER_BATTERY = LAYER_DEFAULT + 5
-LAYER_NUMBER = LAYER_DEFAULT + 10
-LAYER_BACKDROP = LAYER_DEFAULT - 10
-DISPLAY_ID = 0
+CONFIG["LAYER_DEFAULT"] = 15000
+CONFIG["LAYER_BATTERY"] = CONFIG["LAYER_DEFAULT"] + 5
+CONFIG["LAYER_NUMBER"] = CONFIG["LAYER_DEFAULT"] + 10
+CONFIG["LAYER_BACKDROP"] = CONFIG["LAYER_DEFAULT"] - 10
 
-FUEL_GAUGE_SCRIPT_PATH = LIB_PATH + "bq27441_lib/"
-FUEL_GAUGE_I2C_BUS_ID = 1
-FUEL_GAUGE_I2C_DEVICE_ID = 0x55
-FUEL_GAUGE_COMMAND = ' '.join([
+CONFIG["DISPLAY_ID"] = 0
+CONFIG["IS_VISIBLE"] = True
+CONFIG["INITIAL_VISIBILITY"] = "SAVED" # starting state of hud visibility -> VISIBLE, HIDDEN, SAVED (used last saved value)
+CONFIG["POWER_SWITCH_BEHAVIOR"] = "TOGGLE" # TOGGLE, FLASH (button press shows hud for two seconds then hides it)
+
+CONFIG["FUEL_GAUGE_SCRIPT_PATH"] = CONFIG["LIB_PATH"] + "bq27441_lib/"
+CONFIG["FUEL_GAUGE_I2C_BUS_ID"] = 1
+CONFIG["FUEL_GAUGE_I2C_DEVICE_ID"] = 0x55
+CONFIG["FUEL_GAUGE_COMMAND"] = ' '.join([
     "bash",
     "-c",
     "'.",
-    FUEL_GAUGE_SCRIPT_PATH + "bq27441_lib.sh",
-    str(FUEL_GAUGE_I2C_BUS_ID),
-    str(FUEL_GAUGE_I2C_DEVICE_ID),
+    CONFIG["FUEL_GAUGE_SCRIPT_PATH"] + "bq27441_lib.sh",
+    str(CONFIG["FUEL_GAUGE_I2C_BUS_ID"]),
+    str(CONFIG["FUEL_GAUGE_I2C_DEVICE_ID"]),
     ";"
 ]) + " "
 
-BATTERY_GPOUT_PIN = 29 # board pin 29 is GPIO5
-BATTERY_POWER_PIN = 36 # board pin 36 is GPIO16 (tied to GPIO6 in hardware)
+CONFIG["BATTERY_GPOUT_PIN"] = 29 # board pin 29 is GPIO5
+CONFIG["BATTERY_POWER_PIN"] = 36 # board pin 36 is GPIO16 (tied to GPIO6 in hardware)
+
+
+__ORIGINAL_SIGINT__ = None
+__LAST_POWER_BUTTON_PRESSED_TIME__ = None
+__PNGVIEW_PROCESSES__ = {}
+__DIMENSION_CACHE__ = {}
 
 
 # -----------------------------------------------------------------------------
@@ -83,16 +89,16 @@ def pngview(draw_id, pngfile, **kwargs):
         [None if not str(v) else str(v) for v in kwargs.values()]
     ) for val in pair]
 
-    pngview_call.insert(0, PNGVIEW_PATH)
+    pngview_call.insert(0, CONFIG["PNGVIEW_PATH"])
     pngview_call.append(pngfile)
 
     pngview_call = filter((None).__ne__, pngview_call)
 
     pid = subprocess.Popen(pngview_call)
     time.sleep(0.025) # this is a hack to prevent flickering
-    if draw_id in PNGVIEW_PROCESSES:
-        PNGVIEW_PROCESSES[draw_id].kill()
-    PNGVIEW_PROCESSES[draw_id] = pid
+    if draw_id in __PNGVIEW_PROCESSES__:
+        __PNGVIEW_PROCESSES__[draw_id].kill()
+    __PNGVIEW_PROCESSES__[draw_id] = pid
 
     return pid
 
@@ -115,9 +121,9 @@ def png_dimensions(fname):
     """ Returns a pair of integers that are the width and height of the image.
         This only works for PNG images.
     """
-    global DIMENSION_CACHE
-    if fname in DIMENSION_CACHE:
-        return DIMENSION_CACHE[fname]
+    global __DIMENSION_CACHE__
+    if fname in __DIMENSION_CACHE__:
+        return __DIMENSION_CACHE__[fname]
 
     with open(fname, 'rb') as fhandle:
         head = fhandle.read(24)
@@ -128,8 +134,8 @@ def png_dimensions(fname):
             if check != 0x0d0a1a0a:
                 raise TypeError("Invalid PNG file provided: %s" % fname)
             width, height = struct.unpack('>ii', head[16:24])
-            DIMENSION_CACHE[fname] = (width, height)
-            return DIMENSION_CACHE[fname]
+            __DIMENSION_CACHE__[fname] = (width, height)
+            return __DIMENSION_CACHE__[fname]
         else:
             raise TypeError("Invalid PNG file provided: %s" % fname)
 
@@ -141,8 +147,8 @@ def draw_hud(**kwargs):
         is_charging - boolean with whether or not the device is charging
     """
 
-    if not __IS_VISIBLE__:
-        for v in PNGVIEW_PROCESSES.values():
+    if not CONFIG["IS_VISIBLE"]:
+        for v in __PNGVIEW_PROCESSES__.values():
             v.kill()
         return
 
@@ -164,11 +170,18 @@ def draw_hud(**kwargs):
 
     try:
         # draw backdrop
-        backdrop_image_path = IMAGE_PATH + "backdrop.png"
+        backdrop_image_path = CONFIG["IMAGE_PATH"] + "backdrop.png"
         backdrop_image_dimensions = png_dimensions(backdrop_image_path)
         backdrop_pos = (screen[0] - backdrop_image_dimensions[0], 0)
 
-        pngview("backdrop", backdrop_image_path, d=DISPLAY_ID, l=LAYER_BACKDROP, x=backdrop_pos[0], y=backdrop_pos[1])
+        pngview(
+            "backdrop",
+            backdrop_image_path,
+            d=CONFIG["DISPLAY_ID"],
+            l=CONFIG["LAYER_BACKDROP"],
+            x=backdrop_pos[0],
+            y=backdrop_pos[1]
+        )
 
         # draw battery in upper right corner
         battery_image_path = charge_to_img_path(kwargs['battery'], kwargs['is_charging'])
@@ -177,16 +190,23 @@ def draw_hud(**kwargs):
         h_cursor = h_cursor - battery_image_dimensions[0] - H_PADDING
         battery_pos = (h_cursor, V_PADDING)
 
-        pngview("battery", battery_image_path, d=DISPLAY_ID, l=LAYER_BATTERY, x=battery_pos[0], y=battery_pos[1])
+        pngview(
+            "battery",
+            battery_image_path,
+            d=CONFIG["DISPLAY_ID"],
+            l=CONFIG["LAYER_BATTERY"],
+            x=battery_pos[0],
+            y=battery_pos[1]
+        )
 
         # draw charge number
-        percent_path = IMAGE_PATH + "percent.png"
+        percent_path = CONFIG["IMAGE_PATH"] + "percent.png"
         percent_dimensions = png_dimensions(percent_path)
 
         h_cursor = h_cursor - percent_dimensions[0] - H_PADDING
         percent_pos = (h_cursor, V_PADDING)
 
-        pngview("percent", percent_path, d=DISPLAY_ID, l=LAYER_NUMBER, x=percent_pos[0], y=percent_pos[1])
+        pngview("percent", percent_path, d=CONFIG["DISPLAY_ID"], l=CONFIG["LAYER_NUMBER"], x=percent_pos[0], y=percent_pos[1])
 
         digit_idx = 0
         intnum = kwargs['battery']
@@ -194,13 +214,20 @@ def draw_hud(**kwargs):
             digit = int(intnum % 10)
             intnum = int(intnum / 10)
 
-            digit_image_path = IMAGE_PATH + "num" + str(digit) + ".png"
+            digit_image_path = CONFIG["IMAGE_PATH"] + "num" + str(digit) + ".png"
             digit_dimensions = png_dimensions(digit_image_path)
 
             h_cursor = h_cursor - digit_dimensions[0]
             digit_pos = (h_cursor, V_PADDING)
 
-            pngview("digit" + str(digit_idx), digit_image_path, d=DISPLAY_ID, l=LAYER_NUMBER, x=digit_pos[0], y=digit_pos[1])
+            pngview(
+                "digit" + str(digit_idx),
+                digit_image_path,
+                d=CONFIG["DISPLAY_ID"],
+                l=CONFIG["LAYER_NUMBER"],
+                x=digit_pos[0],
+                y=digit_pos[1]
+            )
             digit_idx = digit_idx + 1
 
             if intnum == 0:
@@ -208,8 +235,8 @@ def draw_hud(**kwargs):
 
         # remove unnecessary digits if applicable
         digit_id = "digit" + str(digit_idx)
-        while digit_id in PNGVIEW_PROCESSES:
-            PNGVIEW_PROCESSES[digit_id].kill()
+        while digit_id in __PNGVIEW_PROCESSES__:
+            __PNGVIEW_PROCESSES__[digit_id].kill()
             digit_idx = digit_idx + 1
             digit_id = "digit" + str(digit_idx)
 
@@ -225,7 +252,7 @@ def fuel_gauge_command(func):
     """ Construct the bash script command line string to call the function
         name provided by `func`.
     """
-    return FUEL_GAUGE_COMMAND + func + "'"
+    return CONFIG["FUEL_GAUGE_COMMAND"] + func + "'"
 
 
 def get_state_of_charge():
@@ -250,7 +277,7 @@ def charge_to_img_path(charge, is_charging = False):
     """ Given a percentage of remaining battery life, return the corresponding
         image file.
     """
-    battery_image_path = IMAGE_PATH + "battery"
+    battery_image_path = CONFIG["IMAGE_PATH"] + "battery"
 
     if charge > 95:
         charge_suffix = "100" 
@@ -280,15 +307,15 @@ def gpio_setup():
     """ Setup for all GPIO pins
     """
     GPIO.setmode(GPIO.BOARD)
-    GPIO.setup(BATTERY_GPOUT_PIN, GPIO.IN)
-    GPIO.setup(BATTERY_POWER_PIN, GPIO.IN)
+    GPIO.setup(CONFIG["BATTERY_GPOUT_PIN"], GPIO.IN)
+    GPIO.setup(CONFIG["BATTERY_POWER_PIN"], GPIO.IN)
 
     global __ORIGINAL_SIGINT__
     __ORIGINAL_SIGINT__ = signal.getsignal(signal.SIGINT)
     signal.signal(signal.SIGINT, on_exit)
 
-    GPIO.add_event_detect(BATTERY_GPOUT_PIN, GPIO.FALLING, callback=handle_battery_charge_state_change)
-    GPIO.add_event_detect(BATTERY_POWER_PIN, GPIO.BOTH, callback=handle_power_button_press)
+    GPIO.add_event_detect(CONFIG["BATTERY_GPOUT_PIN"], GPIO.FALLING, callback=handle_battery_charge_state_change)
+    GPIO.add_event_detect(CONFIG["BATTERY_POWER_PIN"], GPIO.BOTH, callback=handle_power_button_press)
 
 
 def on_exit(signum, frame):
@@ -300,7 +327,7 @@ def on_exit(signum, frame):
     GPIO.cleanup()
 
     # kill all pngview processes
-    for v in PNGVIEW_PROCESSES.values():
+    for v in __PNGVIEW_PROCESSES__.values():
         v.kill()
 
     sys.exit(0)
@@ -320,15 +347,16 @@ def handle_power_button_press(channel):
         controller input. Presses longer than 6.6 seconds will turn off the
         device in hardware.
     """
-    global __LAST_POWER_BUTTON_PRESSED_TIME__, __IS_VISIBLE__
+    global CONFIG
+    global __LAST_POWER_BUTTON_PRESSED_TIME__
     time.sleep(0.075) # debounce 100ms
 
-    if GPIO.input(BATTERY_POWER_PIN):
+    if GPIO.input(CONFIG["BATTERY_POWER_PIN"]):
         # input is high, button was released
         release_time = datetime.datetime.now()
         if release_time - __LAST_POWER_BUTTON_PRESSED_TIME__ < datetime.timedelta(0, 0, 0, 500):
             # short press has happened
-            __IS_VISIBLE__ = not __IS_VISIBLE__
+            CONFIG["IS_VISIBLE"] = not CONFIG["IS_VISIBLE"]
             draw_hud(battery=get_state_of_charge(), is_charging=(not is_discharging()))
         else:
             # long press has happened
