@@ -47,3 +47,4 @@ References
 
 [1] https://sourceforge.net/p/raspberry-gpio-python/wiki/Home/ -  RPi.GPIO documentation and examples
 [2] https://github.com/d-rez/gbz\_overlay - Reference for making an RPi graphical overlay
+[3] https://github.com/torfsen/python-systemd-tutorial - Adding Python script as systemd service

@@ -43,15 +43,6 @@ CONFIG["POWER_SWITCH_FLASH_DURATION"] = 3 # in seconds
 CONFIG["FUEL_GAUGE_SCRIPT_PATH"] = CONFIG["LIB_PATH"] + "bq27441_lib/"
 CONFIG["FUEL_GAUGE_I2C_BUS_ID"] = 1
 CONFIG["FUEL_GAUGE_I2C_DEVICE_ID"] = 0x55
-CONFIG["FUEL_GAUGE_COMMAND"] = ' '.join([
-    "bash",
-    "-c",
-    "'.",
-    CONFIG["FUEL_GAUGE_SCRIPT_PATH"] + "bq27441_lib.sh",
-    str(CONFIG["FUEL_GAUGE_I2C_BUS_ID"]),
-    str(CONFIG["FUEL_GAUGE_I2C_DEVICE_ID"]),
-    ";"
-]) + " "
 
 CONFIG["BATTERY_GPOUT_PIN"] = 29 # board pin 29 is GPIO5
 CONFIG["BATTERY_POWER_PIN"] = 36 # board pin 36 is GPIO16 (tied to GPIO6 in hardware)
@@ -61,6 +52,7 @@ __ORIGINAL_SIGINT__ = None
 __LAST_POWER_BUTTON_PRESSED_TIME__ = None
 __PNGVIEW_PROCESSES__ = {}
 __DIMENSION_CACHE__ = {}
+__SCRIPT_PATH__ = os.path.dirname(os.path.realpath(__file__))
 
 
 # -----------------------------------------------------------------------------
@@ -68,35 +60,48 @@ __DIMENSION_CACHE__ = {}
 # -----------------------------------------------------------------------------
 def read_config_file(config_file_path):
     """ Read the config file, if it exists and update the necessary
+        configuration parameters and return a dictionary with the
         configuration parameters.
+
+        NOTE: this does not overwrite the configuration, the caller
+        must do this themselves.
     """
-    global CONFIG
     config_file_path = os.path.expanduser(config_file_path)
 
     try:
         with open(config_file_path, 'r') as fhandle:
             serialized = ' '.join(fhandle.readlines())
-            CONFIG = json.loads(serialized)
+            config = json.loads(serialized)
     except FileNotFoundError as e:
         print("WARNING: Could not find config file at '%s'. Using default config." % config_file_path)
         write_config_file(config_file_path)
 
-    if CONFIG["POWER_SWITCH_BEHAVIOR"] == "INITIAL_OFF":
-        CONFIG["IS_VISIBLE"] = False
-    elif CONFIG["POWER_SWITCH_BEHAVIOR"] == "INITIAL_ON":
-        CONFIG["IS_VISIBLE"] = True
-    elif CONFIG["POWER_SWITCH_BEHAVIOR"] == "FLASH" or CONFIG["POWER_SWITCH_BEHAVIOR"] == "FLASH_INITIAL_ON":
-        CONFIG["IS_VISIBLE"] = False
+    if config["POWER_SWITCH_BEHAVIOR"] == "INITIAL_OFF":
+        config["IS_VISIBLE"] = False
+    elif config["POWER_SWITCH_BEHAVIOR"] == "INITIAL_ON":
+        config["IS_VISIBLE"] = True
+    elif config["POWER_SWITCH_BEHAVIOR"] == "FLASH" or config["POWER_SWITCH_BEHAVIOR"] == "FLASH_INITIAL_ON":
+        config["IS_VISIBLE"] = False
+
+    return config
 
 
-def write_config_file(config_file_path):
+def write_config_file(config_file_path, write_args=CONFIG.keys()):
     """ Write the config file, writing it if it does not exist
+
+        Caller can provide an optional list of CONFIG keys. If this
+        list is not empty, only the values in the keys will be
+        updated. The other values will be read from the current
+        state of the config file.
     """
     config_file_path = os.path.expanduser(config_file_path)
+    config = read_config_file(config_file_path)
+    for k in write_args:
+        config[k] = CONFIG[k]
 
     try:
         with open(config_file_path, 'w+') as fhandle:
-            serialized = json.dumps(CONFIG, indent=2, sort_keys=True)
+            serialized = json.dumps(config, indent=2, sort_keys=True)
             fhandle.write(serialized)
     except Exception as e:
         print("Error opening config file: %s" % config_file_path)
@@ -314,7 +319,17 @@ def fuel_gauge_command(func):
     """ Construct the bash script command line string to call the function
         name provided by `func`.
     """
-    return CONFIG["FUEL_GAUGE_COMMAND"] + func + "'"
+    return ' '.join([
+        "bash",
+        "-c",
+        "'.",
+        CONFIG["FUEL_GAUGE_SCRIPT_PATH"] + "bq27441_lib.sh",
+        str(CONFIG["FUEL_GAUGE_I2C_BUS_ID"]),
+        str(CONFIG["FUEL_GAUGE_I2C_DEVICE_ID"]),
+        ";",
+        func,
+        "'"
+    ])
 
 
 def get_state_of_charge():
@@ -323,7 +338,12 @@ def get_state_of_charge():
         and 100 representing a percentage of max battery charge capacity.
     """
     result = subprocess.run(fuel_gauge_command("get_battery_percentage"), capture_output=True, shell=True)
-    return int(result.stdout.decode('utf-8'))
+    try:
+        soc = int(result.stdout.decode('utf-8'))
+    except ValueError as e:
+        print(result)
+        raise ValueError(e)
+    return soc
 
 
 def is_discharging():
@@ -372,30 +392,8 @@ def gpio_setup():
     GPIO.setup(CONFIG["BATTERY_GPOUT_PIN"], GPIO.IN)
     GPIO.setup(CONFIG["BATTERY_POWER_PIN"], GPIO.IN)
 
-    global __ORIGINAL_SIGINT__
-    __ORIGINAL_SIGINT__ = signal.getsignal(signal.SIGINT)
-    signal.signal(signal.SIGINT, on_exit)
-
     GPIO.add_event_detect(CONFIG["BATTERY_GPOUT_PIN"], GPIO.FALLING, callback=handle_battery_charge_state_change)
     GPIO.add_event_detect(CONFIG["BATTERY_POWER_PIN"], GPIO.BOTH, callback=handle_power_button_press)
-
-
-def on_exit(signum, frame):
-    # restore the original signal handler as otherwise evil things will happen
-    # in raw_input when CTRL+C is pressed, and our signal handler is not re-entrant
-    signal.signal(signal.SIGINT, __ORIGINAL_SIGINT__)
-
-    # release all the RPi.GPIO pins
-    GPIO.cleanup()
-
-    # kill all pngview processes
-    for v in __PNGVIEW_PROCESSES__.values():
-        v.kill()
-
-    # write to config file
-    write_config_file(CONFIG["CONFIG_FILE_PATH"])
-
-    sys.exit(0)
 
 
 def handle_battery_charge_state_change(channel):
@@ -456,8 +454,50 @@ def __flash_helper(wakeup_time):
     set_visibility(False)
 
 
+# -----------------------------------------------------------------------------
+# System utilities
+# -----------------------------------------------------------------------------
+def system_setup():
+    """ Add signal handlers for user keyboard interrupt and systemd termination
+        interrupt.
+    """
+    global __ORIGINAL_SIGINT__
+    __ORIGINAL_SIGINT__ = signal.getsignal(signal.SIGINT)
+    signal.signal(signal.SIGINT, on_exit)
+
+    signal.signal(signal.SIGTERM, on_exit)
+
+
+def on_exit(signum, frame):
+    """ Do all the cleaup needed on program exit. It is important that this
+        is run every time!
+    """
+    # restore the original signal handler as otherwise evil things will happen
+    # in raw_input when CTRL+C is pressed, and our signal handler is not re-entrant
+    signal.signal(signal.SIGINT, __ORIGINAL_SIGINT__)
+
+    # release all the RPi.GPIO pins
+    GPIO.cleanup()
+
+    # kill all pngview processes
+    for v in __PNGVIEW_PROCESSES__.values():
+        v.kill()
+
+    # write to config file (only want to update is_visible)
+    write_config_file(CONFIG["CONFIG_FILE_PATH"], ["IS_VISIBLE"])
+
+    sys.exit(0)
+
+
 if __name__ == '__main__':
-    read_config_file(CONFIG["CONFIG_FILE_PATH"])
+    system_setup()
+    CONFIG = read_config_file(CONFIG["CONFIG_FILE_PATH"])
+
+    # convert all relative paths to absolute paths
+    CONFIG["IMAGE_PATH"] = os.path.join(__SCRIPT_PATH__, CONFIG["IMAGE_PATH"])
+    CONFIG["LIB_PATH"] = os.path.join(__SCRIPT_PATH__, CONFIG["LIB_PATH"])
+    CONFIG["FUEL_GAUGE_SCRIPT_PATH"] = os.path.join(__SCRIPT_PATH__, CONFIG["FUEL_GAUGE_SCRIPT_PATH"])
+
     gpio_setup()
     draw_hud(battery=get_state_of_charge(), is_charging=(not is_discharging()))
 

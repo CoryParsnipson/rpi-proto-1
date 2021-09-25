@@ -1,0 +1,12 @@
+[Unit]
+Description=Status Overlay (Battery level, etc) for RPi Device
+After=multi-user.target
+
+[Service]
+Type=simple
+User=pi
+ExecStart=/usr/bin/python3 /usr/bin/status_overlay/status_overlay.py
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target
