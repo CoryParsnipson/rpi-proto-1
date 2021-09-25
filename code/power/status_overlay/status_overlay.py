@@ -15,7 +15,7 @@ import RPi.GPIO as GPIO
 __ORIGINAL_SIGINT__ = None
 __LAST_POWER_BUTTON_PRESSED_TIME__ = None
 
-IS_VISIBLE = True
+__IS_VISIBLE__ = True
 
 IMAGE_PATH = "images/"
 LIB_PATH = "lib/"
@@ -141,7 +141,7 @@ def draw_hud(**kwargs):
         is_charging - boolean with whether or not the device is charging
     """
 
-    if not IS_VISIBLE:
+    if not __IS_VISIBLE__:
         for v in PNGVIEW_PROCESSES.values():
             v.kill()
         return
@@ -320,7 +320,7 @@ def handle_power_button_press(channel):
         controller input. Presses longer than 6.6 seconds will turn off the
         device in hardware.
     """
-    global __LAST_POWER_BUTTON_PRESSED_TIME__, IS_VISIBLE
+    global __LAST_POWER_BUTTON_PRESSED_TIME__, __IS_VISIBLE__
     time.sleep(0.075) # debounce 100ms
 
     if GPIO.input(BATTERY_POWER_PIN):
@@ -328,7 +328,7 @@ def handle_power_button_press(channel):
         release_time = datetime.datetime.now()
         if release_time - __LAST_POWER_BUTTON_PRESSED_TIME__ < datetime.timedelta(0, 0, 0, 500):
             # short press has happened
-            IS_VISIBLE = not IS_VISIBLE
+            __IS_VISIBLE__ = not __IS_VISIBLE__
             draw_hud(battery=get_state_of_charge(), is_charging=(not is_discharging()))
         else:
             # long press has happened
