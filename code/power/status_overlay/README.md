@@ -42,6 +42,19 @@ Install pngview.
   $ sudo cp pngview/pngview /usr/local/bin/
 ```
 
+Installation
+============
+
+```
+  $ sudo make install # copy files to /usr/bin and install systemd service to run on boot
+  $ sudo make clean   # undo everything that `make install` does
+
+  $ sudo make status  # check on systemd service
+
+  $ sudo make start   # manually start systemd service
+  $ sudo make stop    # manually stop systemd service
+```
+
 References
 ==========
 
