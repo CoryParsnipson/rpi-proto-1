@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import datetime
 import imghdr
 import os
 import re
@@ -11,7 +12,10 @@ import time
 
 import RPi.GPIO as GPIO
 
-__ORIGINAL_SIGINT__=None
+__ORIGINAL_SIGINT__ = None
+__LAST_POWER_BUTTON_PRESSED_TIME__ = None
+
+IS_VISIBLE = True
 
 IMAGE_PATH = "images/"
 LIB_PATH = "lib/"
@@ -136,6 +140,11 @@ def draw_hud(**kwargs):
         battery - integer with remaining battery charge
         is_charging - boolean with whether or not the device is charging
     """
+
+    if not IS_VISIBLE:
+        for v in PNGVIEW_PROCESSES.values():
+            v.kill()
+        return
 
     if 'battery' not in kwargs:
         kwargs['battery'] = 0
@@ -279,7 +288,7 @@ def gpio_setup():
     signal.signal(signal.SIGINT, on_exit)
 
     GPIO.add_event_detect(BATTERY_GPOUT_PIN, GPIO.FALLING, callback=handle_battery_charge_state_change)
-    GPIO.add_event_detect(BATTERY_POWER_PIN, GPIO.FALLING, callback=handle_power_button_press)
+    GPIO.add_event_detect(BATTERY_POWER_PIN, GPIO.BOTH, callback=handle_power_button_press)
 
 
 def on_exit(signum, frame):
@@ -311,7 +320,22 @@ def handle_power_button_press(channel):
         controller input. Presses longer than 6.6 seconds will turn off the
         device in hardware.
     """
-    print("Power button event detected!")
+    global __LAST_POWER_BUTTON_PRESSED_TIME__, IS_VISIBLE
+    time.sleep(0.075) # debounce 100ms
+
+    if GPIO.input(BATTERY_POWER_PIN):
+        # input is high, button was released
+        release_time = datetime.datetime.now()
+        if release_time - __LAST_POWER_BUTTON_PRESSED_TIME__ < datetime.timedelta(0, 0, 0, 500):
+            # short press has happened
+            IS_VISIBLE = not IS_VISIBLE
+            draw_hud(battery=get_state_of_charge(), is_charging=(not is_discharging()))
+        else:
+            # long press has happened
+            pass
+    else:
+        # input was low, button was pressed
+        __LAST_POWER_BUTTON_PRESSED_TIME__ = datetime.datetime.now()
 
 
 if __name__ == '__main__':
