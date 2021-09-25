@@ -2,18 +2,22 @@
 
 import datetime
 import imghdr
+import json
 import os
 import re
 import signal
 import struct
 import subprocess
 import sys
+import threading
 import time
 
 import RPi.GPIO as GPIO
 
 
 CONFIG = {}
+
+CONFIG["CONFIG_FILE_PATH"] = "~/.status_overlay_config"
 
 CONFIG["IMAGE_PATH"] = "images/"
 CONFIG["LIB_PATH"] = "lib/"
@@ -26,8 +30,15 @@ CONFIG["LAYER_BACKDROP"] = CONFIG["LAYER_DEFAULT"] - 10
 
 CONFIG["DISPLAY_ID"] = 0
 CONFIG["IS_VISIBLE"] = True
-CONFIG["INITIAL_VISIBILITY"] = "SAVED" # starting state of hud visibility -> VISIBLE, HIDDEN, SAVED (used last saved value)
-CONFIG["POWER_SWITCH_BEHAVIOR"] = "TOGGLE" # TOGGLE, FLASH (button press shows hud for two seconds then hides it)
+
+# INITIAL_ON -> toggle mode, start with hud visible
+# INITIAL_OFF -> toggle mode, start with hud hidden
+# SAVED -> toggle mode, start with state read from config file
+# FLASH (show hud on button press for a short time then hide)
+# FLASH_INITIAL_ON -> Flash mode with hud shown for 3 seconds on start
+CONFIG["POWER_SWITCH_BEHAVIOR"] = "SAVED"
+
+CONFIG["POWER_SWITCH_FLASH_DURATION"] = 3 # in seconds
 
 CONFIG["FUEL_GAUGE_SCRIPT_PATH"] = CONFIG["LIB_PATH"] + "bq27441_lib/"
 CONFIG["FUEL_GAUGE_I2C_BUS_ID"] = 1
@@ -50,6 +61,47 @@ __ORIGINAL_SIGINT__ = None
 __LAST_POWER_BUTTON_PRESSED_TIME__ = None
 __PNGVIEW_PROCESSES__ = {}
 __DIMENSION_CACHE__ = {}
+
+
+# -----------------------------------------------------------------------------
+# Configuration utilities
+# -----------------------------------------------------------------------------
+def read_config_file(config_file_path):
+    """ Read the config file, if it exists and update the necessary
+        configuration parameters.
+    """
+    global CONFIG
+    config_file_path = os.path.expanduser(config_file_path)
+
+    try:
+        with open(config_file_path, 'r') as fhandle:
+            serialized = ' '.join(fhandle.readlines())
+            CONFIG = json.loads(serialized)
+    except FileNotFoundError as e:
+        print("WARNING: Could not find config file at '%s'. Using default config." % config_file_path)
+        write_config_file(config_file_path)
+
+    if CONFIG["POWER_SWITCH_BEHAVIOR"] == "INITIAL_OFF":
+        CONFIG["IS_VISIBLE"] = False
+    elif CONFIG["POWER_SWITCH_BEHAVIOR"] == "INITIAL_ON":
+        CONFIG["IS_VISIBLE"] = True
+    elif CONFIG["POWER_SWITCH_BEHAVIOR"] == "FLASH" or CONFIG["POWER_SWITCH_BEHAVIOR"] == "FLASH_INITIAL_ON":
+        CONFIG["IS_VISIBLE"] = False
+
+
+def write_config_file(config_file_path):
+    """ Write the config file, writing it if it does not exist
+    """
+    config_file_path = os.path.expanduser(config_file_path)
+
+    try:
+        with open(config_file_path, 'w+') as fhandle:
+            serialized = json.dumps(CONFIG, indent=2, sort_keys=True)
+            fhandle.write(serialized)
+    except Exception as e:
+        print("Error opening config file: %s" % config_file_path)
+        print(e)
+        sys.exit(1)
 
 
 # -----------------------------------------------------------------------------
@@ -125,19 +177,29 @@ def png_dimensions(fname):
     if fname in __DIMENSION_CACHE__:
         return __DIMENSION_CACHE__[fname]
 
-    with open(fname, 'rb') as fhandle:
-        head = fhandle.read(24)
-        if len(head) != 24:
-            raise TypeError("Invalid PNG file provided: %s" % fname)
-        if imghdr.what(fname) == 'png':
-            check = struct.unpack('>i', head[4:8])[0]
-            if check != 0x0d0a1a0a:
+    try:
+        with open(fname, 'rb') as fhandle:
+            head = fhandle.read(24)
+            if len(head) != 24:
                 raise TypeError("Invalid PNG file provided: %s" % fname)
-            width, height = struct.unpack('>ii', head[16:24])
-            __DIMENSION_CACHE__[fname] = (width, height)
-            return __DIMENSION_CACHE__[fname]
-        else:
-            raise TypeError("Invalid PNG file provided: %s" % fname)
+            if imghdr.what(fname) == 'png':
+                check = struct.unpack('>i', head[4:8])[0]
+                if check != 0x0d0a1a0a:
+                    raise TypeError("Invalid PNG file provided: %s" % fname)
+                width, height = struct.unpack('>ii', head[16:24])
+                __DIMENSION_CACHE__[fname] = (width, height)
+                return __DIMENSION_CACHE__[fname]
+            else:
+                raise TypeError("Invalid PNG file provided: %s" % fname)
+    except FileNotFoundError as e:
+        print(e)
+
+
+def set_visibility(is_visible):
+    """ Set the visibility of the hud
+    """
+    CONFIG["IS_VISIBLE"] = is_visible
+    draw_hud(battery=get_state_of_charge(), is_charging=(not is_discharging()))
 
 
 def draw_hud(**kwargs):
@@ -330,6 +392,9 @@ def on_exit(signum, frame):
     for v in __PNGVIEW_PROCESSES__.values():
         v.kill()
 
+    # write to config file
+    write_config_file(CONFIG["CONFIG_FILE_PATH"])
+
     sys.exit(0)
 
 
@@ -347,7 +412,6 @@ def handle_power_button_press(channel):
         controller input. Presses longer than 6.6 seconds will turn off the
         device in hardware.
     """
-    global CONFIG
     global __LAST_POWER_BUTTON_PRESSED_TIME__
     time.sleep(0.075) # debounce 100ms
 
@@ -356,8 +420,10 @@ def handle_power_button_press(channel):
         release_time = datetime.datetime.now()
         if release_time - __LAST_POWER_BUTTON_PRESSED_TIME__ < datetime.timedelta(0, 0, 0, 500):
             # short press has happened
-            CONFIG["IS_VISIBLE"] = not CONFIG["IS_VISIBLE"]
-            draw_hud(battery=get_state_of_charge(), is_charging=(not is_discharging()))
+            if CONFIG["POWER_SWITCH_BEHAVIOR"] == "FLASH" or CONFIG["POWER_SWITCH_BEHAVIOR"] == "FLASH_INITIAL_ON":
+                flash_behavior()
+            else:
+                toggle_behavior()
         else:
             # long press has happened
             pass
@@ -366,9 +432,37 @@ def handle_power_button_press(channel):
         __LAST_POWER_BUTTON_PRESSED_TIME__ = datetime.datetime.now()
 
 
+def toggle_behavior():
+    """ Toggle the hud visibility on short press of power button
+    """
+    set_visibility(not CONFIG["IS_VISIBLE"])
+
+
+def flash_behavior():
+    """ Make the hud visible for a short time on short press of power button
+    """
+    if CONFIG["IS_VISIBLE"]:
+        return
+
+    set_visibility(True)
+    helper = threading.Thread(target=__flash_helper, args=(CONFIG["POWER_SWITCH_FLASH_DURATION"],), daemon=True)
+    helper.start()
+
+
+def __flash_helper(wakeup_time):
+    """ helper for flash behavior. Need to wakeup at specified time and hide hud
+    """
+    time.sleep(wakeup_time)
+    set_visibility(False)
+
+
 if __name__ == '__main__':
+    read_config_file(CONFIG["CONFIG_FILE_PATH"])
     gpio_setup()
     draw_hud(battery=get_state_of_charge(), is_charging=(not is_discharging()))
+
+    if CONFIG["POWER_SWITCH_BEHAVIOR"] == "FLASH_INITIAL_ON":
+        flash_behavior()
 
     while True:
         time.sleep(60)
