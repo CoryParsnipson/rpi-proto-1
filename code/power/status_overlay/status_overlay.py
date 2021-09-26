@@ -536,9 +536,9 @@ def shutdown():
     """ Shut the device down.
     """
     draw_notification("critical_battery.png", "crit_battery", CONFIG["CRITICAL_BATTERY_NOTIFICATION_DURATION"])
-    on_exit(0, 0, False)
     print("Initiating shutdown in 5 seconds...")
     time.sleep(5)
+    on_exit(0, 0, False)
     subprocess.run("sudo shutdown -h now", shell=True)
 
 
