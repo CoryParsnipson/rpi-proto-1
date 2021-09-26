@@ -27,6 +27,7 @@ CONFIG["LAYER_DEFAULT"] = 15000
 CONFIG["LAYER_BATTERY"] = CONFIG["LAYER_DEFAULT"] + 5
 CONFIG["LAYER_NUMBER"] = CONFIG["LAYER_DEFAULT"] + 10
 CONFIG["LAYER_BACKDROP"] = CONFIG["LAYER_DEFAULT"] - 10
+CONFIG["LAYER_NOTIFICATION"] = CONFIG["LAYER_DEFAULT"] + 15
 
 CONFIG["DISPLAY_ID"] = 0
 CONFIG["IS_VISIBLE"] = True
@@ -39,6 +40,8 @@ CONFIG["IS_VISIBLE"] = True
 CONFIG["POWER_SWITCH_BEHAVIOR"] = "SAVED"
 
 CONFIG["POWER_SWITCH_FLASH_DURATION"] = 3 # in seconds
+CONFIG["LOW_BATTERY_NOTIFICATION_DURATION"] = 3 # in seconds
+CONFIG["CRITICAL_BATTERY_NOTIFICATION_DURATION"] = 10 # in seconds
 
 CONFIG["FUEL_GAUGE_SCRIPT_PATH"] = CONFIG["LIB_PATH"] + "bq27441_lib/"
 CONFIG["FUEL_GAUGE_I2C_BUS_ID"] = 1
@@ -51,6 +54,7 @@ CONFIG["BATTERY_POWER_PIN"] = 36 # board pin 36 is GPIO16 (tied to GPIO6 in hard
 __ORIGINAL_SIGINT__ = None
 __LAST_POWER_BUTTON_PRESSED_TIME__ = None
 __PNGVIEW_PROCESSES__ = {}
+__NOTIFICATION_PROCESSES__ = {}
 __DIMENSION_CACHE__ = {}
 __SCRIPT_PATH__ = os.path.dirname(os.path.realpath(__file__))
 
@@ -67,6 +71,7 @@ def read_config_file(config_file_path):
         must do this themselves.
     """
     config_file_path = os.path.expanduser(config_file_path)
+    config = CONFIG
 
     try:
         with open(config_file_path, 'r') as fhandle:
@@ -95,9 +100,16 @@ def write_config_file(config_file_path, write_args=CONFIG.keys()):
         state of the config file.
     """
     config_file_path = os.path.expanduser(config_file_path)
-    config = read_config_file(config_file_path)
-    for k in write_args:
-        config[k] = CONFIG[k]
+    config = {}
+    try:
+        with open(config_file_path, 'r') as fhandle:
+            serialized = ' '.join(fhandle.readlines())
+            config = json.loads(serialized)
+
+            for k in write_args:
+                config[k] = CONFIG[k]
+    except FileNotFoundError as e:
+        config = CONFIG
 
     try:
         with open(config_file_path, 'w+') as fhandle:
@@ -112,7 +124,7 @@ def write_config_file(config_file_path, write_args=CONFIG.keys()):
 # -----------------------------------------------------------------------------
 # Graphical utilites
 # -----------------------------------------------------------------------------
-def pngview(draw_id, pngfile, **kwargs):
+def pngview(draw_id, pngfile, dont_save_pid=False, **kwargs):
     """ Call pngview to display an image on the screen. Returns a process id
         that the pngview call is running in.
 
@@ -155,7 +167,9 @@ def pngview(draw_id, pngfile, **kwargs):
     time.sleep(0.025) # this is a hack to prevent flickering
     if draw_id in __PNGVIEW_PROCESSES__:
         __PNGVIEW_PROCESSES__[draw_id].kill()
-    __PNGVIEW_PROCESSES__[draw_id] = pid
+
+    if not dont_save_pid:
+        __PNGVIEW_PROCESSES__[draw_id] = pid
 
     return pid
 
@@ -310,6 +324,40 @@ def draw_hud(**kwargs):
     except TypeError as e:
         print(e)
         on_exit(0, 0)
+
+
+def draw_notification(fname, draw_id, display_time):
+    """ Draws the specified picture in the center of the screen and 
+    """
+    try:
+        image_path = CONFIG["IMAGE_PATH"] + fname
+
+        pid = pngview(
+            draw_id,
+            image_path,
+            dont_save_pid=True,
+            d=CONFIG["DISPLAY_ID"],
+            l=CONFIG["LAYER_NOTIFICATION"]
+        )
+
+        if draw_id in __NOTIFICATION_PROCESSES__:
+            __NOTIFICATION_PROCESSES__[draw_id].kill()
+        __NOTIFICATION_PROCESSES__[draw_id] = pid
+
+        helper = threading.Thread(target=__hide_notification, args=(draw_id, display_time), daemon=True)
+        helper.start()
+    except TypeError as e:
+        print(e)
+        on_exit(0, 0)
+
+
+def __hide_notification(draw_id, display_time):
+    """ Remove the notification at draw_id after the time specified by
+        display_time has passed.
+    """
+    time.sleep(display_time)
+    if draw_id in __NOTIFICATION_PROCESSES__:
+        __NOTIFICATION_PROCESSES__[draw_id].kill()
 
 
 # -----------------------------------------------------------------------------
