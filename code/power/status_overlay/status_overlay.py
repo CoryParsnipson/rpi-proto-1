@@ -40,8 +40,6 @@ CONFIG["IS_VISIBLE"] = True
 CONFIG["POWER_SWITCH_BEHAVIOR"] = "SAVED"
 
 CONFIG["POWER_SWITCH_FLASH_DURATION"] = 3 # in seconds
-CONFIG["LOW_BATTERY_NOTIFICATION_DURATION"] = 3 # in seconds
-CONFIG["CRITICAL_BATTERY_NOTIFICATION_DURATION"] = 10 # in seconds
 
 CONFIG["FUEL_GAUGE_SCRIPT_PATH"] = CONFIG["LIB_PATH"] + "bq27441_lib/"
 CONFIG["FUEL_GAUGE_I2C_BUS_ID"] = 1
@@ -50,12 +48,19 @@ CONFIG["FUEL_GAUGE_I2C_DEVICE_ID"] = 0x55
 CONFIG["BATTERY_GPOUT_PIN"] = 29 # board pin 29 is GPIO5
 CONFIG["BATTERY_POWER_PIN"] = 36 # board pin 36 is GPIO16 (tied to GPIO6 in hardware)
 
+CONFIG["LOW_BATTERY_NOTIFICATION_DURATION"] = 5 # in seconds
+CONFIG["CRITICAL_BATTERY_NOTIFICATION_DURATION"] = 10 # in seconds
+CONFIG["LOW_BATTERY_THRESHOLD"] = 10
+CONFIG["CRITICAL_BATTERY_THRESHOLD"] = 5
+
 
 __ORIGINAL_SIGINT__ = None
 __LAST_POWER_BUTTON_PRESSED_TIME__ = None
 __PNGVIEW_PROCESSES__ = {}
 __NOTIFICATION_PROCESSES__ = {}
 __DIMENSION_CACHE__ = {}
+__PREVIOUS_STATE_OF_CHARGE__ = 100
+__SHUTDOWN_LOCK__ = threading.Lock()
 __SCRIPT_PATH__ = os.path.dirname(os.path.realpath(__file__))
 
 
@@ -448,7 +453,18 @@ def handle_battery_charge_state_change(channel):
     """ Update the status overlay with new battery life percentage
         information.
     """
-    draw_hud(battery=get_state_of_charge(), is_charging=(not is_discharging()))
+    global __PREVIOUS_STATE_OF_CHARGE__
+
+    charge = get_state_of_charge()
+    draw_hud(battery=charge, is_charging=(not is_discharging()))
+
+    if charge <= CONFIG["LOW_BATTERY_THRESHOLD"] and __PREVIOUS_STATE_OF_CHARGE__ > CONFIG["LOW_BATTERY_THRESHOLD"]:
+        draw_notification("low_battery_warning.png", "low_battery", CONFIG["LOW_BATTERY_NOTIFICATION_DURATION"])
+
+    if charge <= CONFIG["CRITICAL_BATTERY_THRESHOLD"] and __PREVIOUS_STATE_OF_CHARGE__ > CONFIG["CRITICAL_BATTERY_THRESHOLD"]:
+        __SHUTDOWN_LOCK__.release()
+
+    __PREVIOUS_STATE_OF_CHARGE__ = charge
 
 
 def handle_power_button_press(channel):
@@ -516,7 +532,17 @@ def system_setup():
     signal.signal(signal.SIGTERM, on_exit)
 
 
-def on_exit(signum, frame):
+def shutdown():
+    """ Shut the device down.
+    """
+    draw_notification("critical_battery_mock.png", "crit_battery", CONFIG["CRITICAL_BATTERY_NOTIFICATION_DURATION"])
+    on_exit(0, 0, False)
+    print("Initiating shutdown in 5 seconds...")
+    time.sleep(5)
+    subprocess.run("sudo shutdown -h now", shell=True)
+
+
+def on_exit(signum, frame, perform_exit=True):
     """ Do all the cleaup needed on program exit. It is important that this
         is run every time!
     """
@@ -534,7 +560,8 @@ def on_exit(signum, frame):
     # write to config file (only want to update is_visible)
     write_config_file(CONFIG["CONFIG_FILE_PATH"], ["IS_VISIBLE"])
 
-    sys.exit(0)
+    if perform_exit:
+        sys.exit(0)
 
 
 if __name__ == '__main__':
@@ -552,5 +579,7 @@ if __name__ == '__main__':
     if CONFIG["POWER_SWITCH_BEHAVIOR"] == "FLASH_INITIAL_ON":
         flash_behavior()
 
-    while True:
-        time.sleep(60)
+    # acquire this twice because we want the Lock to start out blocking this thread
+    __SHUTDOWN_LOCK__.acquire()
+    __SHUTDOWN_LOCK__.acquire()
+    shutdown()
