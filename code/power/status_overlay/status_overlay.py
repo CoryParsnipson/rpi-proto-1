@@ -535,7 +535,7 @@ def system_setup():
 def shutdown():
     """ Shut the device down.
     """
-    draw_notification("critical_battery_mock.png", "crit_battery", CONFIG["CRITICAL_BATTERY_NOTIFICATION_DURATION"])
+    draw_notification("critical_battery.png", "crit_battery", CONFIG["CRITICAL_BATTERY_NOTIFICATION_DURATION"])
     on_exit(0, 0, False)
     print("Initiating shutdown in 5 seconds...")
     time.sleep(5)
