@@ -20,6 +20,7 @@ CONFIG = {}
 CONFIG["CONFIG_FILE_PATH"] = "~/.status_overlay_config"
 
 CONFIG["IMAGE_PATH"] = "images/"
+CONFIG["SOUND_PATH"] = "sounds/"
 CONFIG["LIB_PATH"] = "lib/"
 CONFIG["PNGVIEW_PATH"] = "pngview"
 
@@ -366,6 +367,16 @@ def __hide_notification(draw_id, display_time):
 
 
 # -----------------------------------------------------------------------------
+# Sound functions
+# -----------------------------------------------------------------------------
+def play_sound(fname):
+    """ Play a sound.
+    """
+    subprocess.run(["omxplayer", "--no-keys", "-o", "alsa", "--vol", "-1000", os.path.join(CONFIG["SOUND_PATH"], fname)],
+        stdout=subprocess.DEVNULL)
+
+
+# -----------------------------------------------------------------------------
 # Battery functions
 # -----------------------------------------------------------------------------
 def fuel_gauge_command(func):
@@ -460,6 +471,7 @@ def handle_battery_charge_state_change(channel):
 
     if charge <= CONFIG["LOW_BATTERY_THRESHOLD"] and __PREVIOUS_STATE_OF_CHARGE__ > CONFIG["LOW_BATTERY_THRESHOLD"]:
         draw_notification("low_battery_warning.png", "low_battery", CONFIG["LOW_BATTERY_NOTIFICATION_DURATION"])
+        play_sound("low_battery.mp3")
 
     if charge <= CONFIG["CRITICAL_BATTERY_THRESHOLD"] and __PREVIOUS_STATE_OF_CHARGE__ > CONFIG["CRITICAL_BATTERY_THRESHOLD"]:
         __SHUTDOWN_LOCK__.release()
@@ -537,6 +549,7 @@ def shutdown():
     """
     draw_notification("critical_battery.png", "crit_battery", CONFIG["CRITICAL_BATTERY_NOTIFICATION_DURATION"])
     print("Initiating shutdown in 5 seconds...")
+    play_sound("shutdown.mp3")
     time.sleep(5)
     on_exit(0, 0, False)
     subprocess.run("sudo shutdown -h now", shell=True)
