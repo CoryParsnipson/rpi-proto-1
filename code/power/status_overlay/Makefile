@@ -20,6 +20,9 @@ stop:
 status:
 	sudo systemctl status status_overlay.service
 
+enable:
+	sudo systemctl enable status_overlay.service
+
 disable:
 	sudo systemctl disable status_overlay.service
 

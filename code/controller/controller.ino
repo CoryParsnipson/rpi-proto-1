@@ -49,7 +49,7 @@ void setup() {
   reset();
   
   if (ENABLE_SERIAL) {
-    Serial.begin(9600);
+    Serial.begin(115200);
     while (!Serial) {
       ; // wait for serial port to connect. Needed for native USB
     }
@@ -74,10 +74,11 @@ void loop() {
       
       pinMode(row, INPUT_PULLUP);
       bool button_state = !digitalRead(row);
+
       pinMode(row, OUTPUT);
       digitalWrite(row, LOW); // discharge any potential floating nodes
       pinMode(row, INPUT);
-      
+
       if (button_state) {
         Gamepad.press(current_button);
         is_pressed = true;
