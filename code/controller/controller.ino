@@ -2,7 +2,8 @@
 #include <HID-Settings.h>
 
 const int REFRESH_INTERVAL = 1000;
-const bool ENABLE_SERIAL = false;
+// change to #define ENABLE_SERIAL if you want serial turned on
+#undef ENABLE_SERIAL
 char* msg = new char[80];
 
 const int NUM_ROWS = 4;
@@ -48,14 +49,14 @@ void setup() {
     
   reset();
   
-  if (ENABLE_SERIAL) {
+#ifdef ENABLE_SERIAL
     Serial.begin(115200);
     while (!Serial) {
       ; // wait for serial port to connect. Needed for native USB
     }
     
     Serial.println("Serial monitor enabled");
-  }
+#endif
 
   Gamepad.begin();
 }
@@ -83,10 +84,10 @@ void loop() {
         Gamepad.press(current_button);
         is_pressed = true;
 
-        if (ENABLE_SERIAL) {
+#ifdef ENABLE_SERIAL
           sprintf(msg, "Row %i, Col %i detected\n", row, col);
           Serial.print(msg);
-        }
+#endif
       } else {
         Gamepad.release(current_button);
       }
@@ -146,16 +147,17 @@ void reset() {
   }
 }
 
+#ifdef ENABLE_SERIAL
 void printAnalog(const long& packedVal) {
-  if (!ENABLE_SERIAL) {
-    return;
-  }
 
   int tx = packedVal >> (sizeof(int) * 8);
   int ty = packedVal & 0xFFFFL;
   sprintf(msg, "Raw: %lx, x-axis: %d, y-axis: %d", packedVal, tx, ty);
   Serial.println(msg);
 }
+#else
+inline void printAnalog(const long& packedVal) {}
+#endif
 
 unsigned long readAnalog(int xPin, int yPin, const int XMIN, const int XMAX, const int YMIN, const int YMAX, bool returnRaw = false) {
   int readX = analogRead(xPin); // store in temporary variables to use in constrain()
