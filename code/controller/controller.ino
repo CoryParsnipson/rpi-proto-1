@@ -36,8 +36,8 @@ const int pinRXAxis = A3;
 const int pinRYAxis = A2;
 
 
-void printAnalog(const long& packedVal);
-uint16_t readAnalog(int pin, const int MIN, const int MAX, bool returnRaw = false);
+inline void printAnalog(const int16_t, const int16_t);
+int16_t readAnalog(int, const int, const int, boolean);
 
 void setup() {
   digitalWrite(pinLXAxis, LOW);
@@ -147,7 +147,7 @@ void printAnalog(int16_t xval, int16_t yval) {
   Serial.println(msg);
 }
 #else
-inline void printAnalog(const long& packedVal) {}
+inline void printAnalog(const int16_t xval, const int16_t yval) {}  // shouldn't need this at all, because all printAnalog() should be wrapped; just in case.
 #endif
 
 int16_t readAnalog(int pin, const int MIN, const int MAX, bool returnRaw=false) {
