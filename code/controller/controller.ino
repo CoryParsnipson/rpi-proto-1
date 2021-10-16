@@ -4,7 +4,9 @@
 const int REFRESH_INTERVAL = 1000;
 // change to #define ENABLE_SERIAL if you want serial turned on
 #undef ENABLE_SERIAL
-char* msg = new char[80];
+
+#define MSG_LEN 80
+char* msg = new char[MSG_LEN];
 
 const int NUM_ROWS = 4;
 const int NUM_COLS = 4;
@@ -35,7 +37,7 @@ const int pinRYAxis = A2;
 
 
 void printAnalog(const long& packedVal);
-unsigned long readAnalog(int xPin, int yPin, const int XMIN, const int XMAX, const int YMIN, const int YMAX, bool returnRaw = false);
+uint16_t readAnalog(int pin, const int MIN, const int MAX, bool returnRaw = false);
 
 void setup() {
   digitalWrite(pinLXAxis, LOW);
@@ -62,80 +64,71 @@ void setup() {
 }
 
 void loop() {
-  bool is_pressed = false;
+  // bool is_pressed = false;  // unused variable?
+  static unsigned long now=0,next_update=0;
+  now=micros();
+  if (next_update < now+now+REFRESH_INTERVAL) { // time to poll our buttons again!
+	next_update=now+REFRESH_INTERVAL;  // no matter how long it takes us to do all the crap here, our next poll will be ASAP after the refresh time expires.
+	for (int c = 0; c < NUM_COLS; ++c) {
+		byte col = COL_PINS[c];
+		pinMode(col, OUTPUT);
+		digitalWrite(col, LOW);
+		//delayMicroseconds(0);  // perhaps needed to wait for the pin to settle.
 
-  for (int c = 0; c < NUM_COLS; ++c) {
-    byte col = COL_PINS[c];
-    pinMode(col, OUTPUT);
-    digitalWrite(col, LOW);
-    
-    for (int r = 0; r < NUM_ROWS; ++r) {
-      byte row = ROW_PINS[r];
-      byte current_button = c * NUM_COLS + r + 1;
-      
-      pinMode(row, INPUT_PULLUP);
-      bool button_state = !digitalRead(row);
+		for (int r = 0; r < NUM_ROWS; ++r) {
+		  byte row = ROW_PINS[r];
+		  byte current_button = c * NUM_COLS + r + 1;
+		  
+		  pinMode(row, INPUT_PULLUP);
+  		  //delayMicroseconds(0);  // perhaps needed to wait for the pin to settle.
+		  bool button_state = !digitalRead(row);
 
-      pinMode(row, OUTPUT);
-      digitalWrite(row, LOW); // discharge any potential floating nodes
-      pinMode(row, INPUT);
+		  pinMode(row, INPUT);    // disable the pullup resistor
+		  pinMode(row, OUTPUT);   // set pin to output
+		  digitalWrite(row, LOW); // discharge any potential floating nodes
+		  pinMode(row, INPUT);    // set pin to hi-z
 
-      if (button_state) {
-        Gamepad.press(current_button);
-        is_pressed = true;
+		  if (button_state) {
+			Gamepad.press(current_button);
+			// is_pressed = true; // unused variable?
 
 #ifdef ENABLE_SERIAL
-          sprintf(msg, "Row %i, Col %i detected\n", row, col);
-          Serial.print(msg);
+			  snprintf(msg, MSG_LEN-1, "Row %i, Col %i detected\n", row, col);  // snprintf to avoid buffer overflow in case something wiggy happens
+			  Serial.print(msg);
 #endif
-      } else {
-        Gamepad.release(current_button);
-      }
-    }
+		  } else {
+			Gamepad.release(current_button);
+		  }
+		}
 
-    pinMode(col, INPUT);
-  }
+		pinMode(col, INPUT);
+	}
 
-  // left thumbstick button polling
-  if (!digitalRead(LEFT_THUMBSTICK_BUTTON_PIN)) {
-    Gamepad.press(NUM_ROWS * NUM_COLS + 1);
-  } else {
-    Gamepad.release(NUM_ROWS * NUM_COLS + 1);
-  }
+	// left thumbstick button polling
+	if (!digitalRead(LEFT_THUMBSTICK_BUTTON_PIN)) {
+	Gamepad.press(NUM_ROWS * NUM_COLS + 1);
+	} else {
+	Gamepad.release(NUM_ROWS * NUM_COLS + 1);
+	}
 
-  // right thumbstick button polling
-  if (!digitalRead(RIGHT_THUMBSTICK_BUTTON_PIN)) {
-    Gamepad.press(NUM_ROWS * NUM_COLS + 2);
-  } else {
-    Gamepad.release(NUM_ROWS * NUM_COLS + 2);
-  } 
+	// right thumbstick button polling
+	if (!digitalRead(RIGHT_THUMBSTICK_BUTTON_PIN)) {
+	Gamepad.press(NUM_ROWS * NUM_COLS + 2);
+	} else {
+	Gamepad.release(NUM_ROWS * NUM_COLS + 2);
+	} 
 
-  unsigned long LStickVal = readAnalog(
-    pinLXAxis,
-    pinLYAxis,
-    L_XMIN_CALIBRATED,
-    L_XMAX_CALIBRATED,
-    L_YMIN_CALIBRATED,
-    L_YMAX_CALIBRATED
-  );
-  Gamepad.xAxis(LStickVal >> (sizeof(int) * 8));
-  Gamepad.yAxis(LStickVal & 0xFFFFL);
-  
-  unsigned long RStickVal = readAnalog(
-    pinRXAxis,
-    pinRYAxis,
-    R_XMIN_CALIBRATED,
-    R_XMAX_CALIBRATED,
-    R_YMIN_CALIBRATED,
-    R_YMAX_CALIBRATED
-  );
-  Gamepad.rxAxis(RStickVal >> (sizeof(int) * 8));
-  Gamepad.ryAxis(RStickVal & 0xFFFFL);
+	Gamepad.xAxis(readAnalog(pinLXAxis,L_XMIN_CALIBRATED,L_XMAX_CALIBRATED);
+	Gamepad.yAxis(-readAnalog(pinLYAxis,L_YMIN_CALIBRATED,L_YMAX_CALIBRATED);
 
-  Gamepad.write();
+	Gamepad.rxAxis(readAnalog(pinRXAxis,R_XMIN_CALIBRATED,R_XMAX_CALIBRATED);
+	Gamepad.ryAxis(-readAnalog(pinRYAxis,R_YMIN_CALIBRATED,R_YMAX_CALIBRATED);
+
+	Gamepad.write();
+	}
 
   delayMicroseconds(REFRESH_INTERVAL);
-}
+} 
 
 void reset() {
   for (int r = 0; r < NUM_ROWS; ++r) {
@@ -148,31 +141,27 @@ void reset() {
 }
 
 #ifdef ENABLE_SERIAL
-void printAnalog(const long& packedVal) {
+void printAnalog(int16_t xval, int16_t yval) {
 
-  int tx = packedVal >> (sizeof(int) * 8);
-  int ty = packedVal & 0xFFFFL;
-  sprintf(msg, "Raw: %lx, x-axis: %d, y-axis: %d", packedVal, tx, ty);
+  snprintf(msg, MSG_LEN-1, "x-axis: %d, y-axis: %d", xval, yval);
   Serial.println(msg);
 }
 #else
 inline void printAnalog(const long& packedVal) {}
 #endif
 
-unsigned long readAnalog(int xPin, int yPin, const int XMIN, const int XMAX, const int YMIN, const int YMAX, bool returnRaw = false) {
-  int readX = analogRead(xPin); // store in temporary variables to use in constrain()
-  int readY = analogRead(yPin); 
+int16_t readAnalog(int pin, const int MIN, const int MAX, bool returnRaw=false) {
+  int16_t ret=0;
+  uint16_t read=0;
   
-  if (!returnRaw) {
-    // clamp values to observed joystick values
-    readX = constrain(readX, XMIN, XMAX);
-    readY = constrain(readY, YMIN, YMAX);
+  read=analogRead(pin);
   
-    readX = map(readX, XMIN, XMAX, -32767, 32767);
-    readY = map(readY, YMIN, YMAX, 32767, -32767); // flip Y axis because of the physical orientation of thumbstick  
+  if(!returnRaw) {
+    read=constrain(read,MIN,MAX);
+    ret=map(read,MIN,MAX,-32767,32767);
   }
-
-  unsigned long packed = readX;
-  packed = (packed << (sizeof(int) * 8)) | (0xFFFF & readY);
-  return packed;
+  else {
+    ret=read;
+  }
+  return ret;
 }
