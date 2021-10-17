@@ -35,8 +35,7 @@ const int pinLYAxis = A1;
 const int pinRXAxis = A3;
 const int pinRYAxis = A2;
 
-
-inline void printAnalog(const int16_t x, const int16_t y);
+inline void printAnalog(const int16_t xval, const int16_t yval);
 int16_t readAxis(int pin, const int min, const int max, boolean returnRaw = false);
 
 void setup() {
@@ -64,61 +63,61 @@ void setup() {
 }
 
 void loop() {
-  static unsigned long now=0,next_update=0;
-  now=micros();
-  if (next_update < now) { // time to poll our buttons again!
-	next_update=now+REFRESH_INTERVAL;  // no matter how long it takes us to do all the crap here, our next poll will be ASAP after the refresh time expires.
-	for (int c = 0; c < NUM_COLS; ++c) {
-		byte col = COL_PINS[c];
-		pinMode(col, OUTPUT);
-		digitalWrite(col, LOW);
+  static unsigned long now = 0, nextUpdate = 0;
+  now = micros();
 
-		for (int r = 0; r < NUM_ROWS; ++r) {
-		  byte row = ROW_PINS[r];
-		  byte current_button = c * NUM_COLS + r + 1;
-		  
-		  pinMode(row, INPUT_PULLUP);
-		  bool button_state = !digitalRead(row);
+  if (nextUpdate < now) {
+    nextUpdate = now + REFRESH_INTERVAL;
 
-		  pinMode(row, INPUT);    // set pin to hi-z
+    for (int c = 0; c < NUM_COLS; ++c) {
+      byte col = COL_PINS[c];
+      pinMode(col, OUTPUT);
+      digitalWrite(col, LOW);
+  
+      for (int r = 0; r < NUM_ROWS; ++r) {
+        byte row = ROW_PINS[r];
+        byte current_button = c * NUM_COLS + r + 1;
 
-		  if (button_state) {
-			Gamepad.press(current_button);
-
+        pinMode(row, INPUT_PULLUP);
+        bool button_state = !digitalRead(row);
+        pinMode(row, INPUT); // set pin to hi-z
+  
+        if (button_state) {
+          Gamepad.press(current_button);
+  
 #ifdef ENABLE_SERIAL
-			  snprintf(msg, MSG_LEN-1, "Row %i, Col %i detected\n", row, col);  // snprintf to avoid buffer overflow in case something wiggy happens
-			  Serial.print(msg);
+          snprintf(msg, MSG_LEN-1, "Row %i, Col %i detected\n", row, col);  // snprintf to avoid buffer overflow in case something wiggy happens
+          Serial.print(msg);
 #endif
-		  } else {
-			Gamepad.release(current_button);
-		  }
-		}
+        } else {
+          Gamepad.release(current_button);
+        }
+      }
+      pinMode(col, INPUT);
+    }
 
-		pinMode(col, INPUT);
-	}
+    // left thumbstick button polling
+    if (!digitalRead(LEFT_THUMBSTICK_BUTTON_PIN)) {
+      Gamepad.press(NUM_ROWS * NUM_COLS + 1);
+    } else {
+      Gamepad.release(NUM_ROWS * NUM_COLS + 1);
+    }
 
-	// left thumbstick button polling
-	if (!digitalRead(LEFT_THUMBSTICK_BUTTON_PIN)) {
-	Gamepad.press(NUM_ROWS * NUM_COLS + 1);
-	} else {
-	Gamepad.release(NUM_ROWS * NUM_COLS + 1);
-	}
+    // right thumbstick button polling
+    if (!digitalRead(RIGHT_THUMBSTICK_BUTTON_PIN)) {
+      Gamepad.press(NUM_ROWS * NUM_COLS + 2);
+    } else {
+      Gamepad.release(NUM_ROWS * NUM_COLS + 2);
+    } 
 
-	// right thumbstick button polling
-	if (!digitalRead(RIGHT_THUMBSTICK_BUTTON_PIN)) {
-	Gamepad.press(NUM_ROWS * NUM_COLS + 2);
-	} else {
-	Gamepad.release(NUM_ROWS * NUM_COLS + 2);
-	} 
+    Gamepad.xAxis(readAxis(pinLXAxis, L_XMIN_CALIBRATED, L_XMAX_CALIBRATED));
+    Gamepad.yAxis(-1 * readAxis(pinLYAxis, L_YMIN_CALIBRATED, L_YMAX_CALIBRATED)); // invert y axis
+    
+    Gamepad.rxAxis(readAxis(pinRXAxis, R_XMIN_CALIBRATED, R_XMAX_CALIBRATED));
+    Gamepad.ryAxis(-1 * readAxis(pinRYAxis, R_YMIN_CALIBRATED, R_YMAX_CALIBRATED)); // invert y axis
 
-	Gamepad.xAxis(readAxis(pinLXAxis,L_XMIN_CALIBRATED,L_XMAX_CALIBRATED));
-	Gamepad.yAxis(-readAxis(pinLYAxis,L_YMIN_CALIBRATED,L_YMAX_CALIBRATED));
-
-	Gamepad.rxAxis(readAxis(pinRXAxis,R_XMIN_CALIBRATED,R_XMAX_CALIBRATED));
-	Gamepad.ryAxis(-readAxis(pinRYAxis,R_YMIN_CALIBRATED,R_YMAX_CALIBRATED));
-
-	Gamepad.write();
-	}
+    Gamepad.write();
+  }
 }
 
 void reset() {
@@ -142,14 +141,10 @@ inline void printAnalog(const int16_t xval, const int16_t yval) {}  // shouldn't
 #endif
 
 int16_t readAxis(int pin, const int min, const int max, bool returnRaw) {
-  int16_t ret=0;
-  uint16_t read=0;
-  
-  read=analogRead(pin);
-  if(returnRaw)
-	return read;
+  uint16_t read = analogRead(pin);
+  if (returnRaw) {
+    return read;
+  }
 
-  read=constrain(read,min,max);
-  ret=map(read,min,max,-32767,32767);
-  return ret;
+  return map(constrain(read, min, max), min, max, -32767, 32767);
 }
