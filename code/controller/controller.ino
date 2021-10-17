@@ -3,8 +3,28 @@
 
 #define MSG_LEN 80
 
-// change to #define ENABLE_SERIAL if you want serial turned on
-#undef ENABLE_SERIAL
+#undef ENABLE_SERIAL // change to #define ENABLE_SERIAL if you want serial turned on
+
+#ifdef ENABLE_SERIAL
+  #define PRINT_SERIAL(...) \
+    snprintf(msg, MSG_LEN - 1, __VA_ARGS__); /* snprintf to avoid accidental buffer overflow */ \
+    Serial.println(msg);
+#else
+  #define PRINT_SERIAL(...) \
+    do {} while(0)
+#endif
+
+#ifdef ENABLE_SERIAL
+  #define INIT_SERIAL(baudRate) \
+    Serial.begin(baudRate); \
+    while (!Serial) { \
+      ; /* wait for serial port to connect. Needed for native USB */ \
+    } \
+    PRINT_SERIAL("Serial monitor enabled")
+#else
+  #define INIT_SERIAL(baudRate) \
+    do {} while(0)
+#endif
 
 const int refreshInterval = 1000;
 
@@ -37,6 +57,7 @@ const int pinLYAxis = A1;
 const int pinRXAxis = A3;
 const int pinRYAxis = A2;
 
+void reset();
 inline void printAnalog(const int16_t xval, const int16_t yval);
 int16_t readAxis(int pin, const int min, const int max, boolean returnRaw = false);
 
@@ -51,15 +72,8 @@ void setup() {
   pinMode(rightThumbstickButtonPin, INPUT_PULLUP);
     
   reset();
-  
-#ifdef ENABLE_SERIAL
-    Serial.begin(115200);
-    while (!Serial) {
-      ; // wait for serial port to connect. Needed for native USB
-    }
-    
-    Serial.println("Serial monitor enabled");
-#endif
+
+  INIT_SERIAL(115200);
 
   Gamepad.begin();
 }
@@ -69,7 +83,8 @@ void loop() {
   now = micros();
 
   if (nextUpdate < now) {
-    nextUpdate = now + refreshInterval;
+    // TODO: maybe sleep would let us squeeze out extra battery life here
+    nextUpdate = now + refreshInterval; 
 
     for (int c = 0; c < numCols; ++c) {
       byte col = colPins[c];
@@ -86,11 +101,7 @@ void loop() {
   
         if (button_state) {
           Gamepad.press(current_button);
-  
-#ifdef ENABLE_SERIAL
-          snprintf(msg, MSG_LEN-1, "Row %i, Col %i detected\n", row, col);  // snprintf to avoid buffer overflow in case something wiggy happens
-          Serial.print(msg);
-#endif
+          PRINT_SERIAL("Row %i, Col %i detected", row, col);
         } else {
           Gamepad.release(current_button);
         }
@@ -132,15 +143,9 @@ void reset() {
   }
 }
 
-#ifdef ENABLE_SERIAL
 void printAnalog(int16_t xval, int16_t yval) {
-
-  snprintf(msg, MSG_LEN-1, "x-axis: %d, y-axis: %d", xval, yval);
-  Serial.println(msg);
+  PRINT_SERIAL("x-axis: %d, y-axis: %d", xval, yval);
 }
-#else
-inline void printAnalog(const int16_t xval, const int16_t yval) {}  // shouldn't need this at all, because all printAnalog() should be wrapped; just in case.
-#endif
 
 int16_t readAxis(int pin, const int min, const int max, bool returnRaw) {
   uint16_t read = analogRead(pin);
