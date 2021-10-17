@@ -37,7 +37,7 @@ const int pinRYAxis = A2;
 
 
 inline void printAnalog(const int16_t, const int16_t);
-int16_t readAnalog(int, const int, const int, boolean);
+int16_t readAxis(int, const int, const int, boolean);
 
 void setup() {
   digitalWrite(pinLXAxis, LOW);
@@ -64,33 +64,26 @@ void setup() {
 }
 
 void loop() {
-  // bool is_pressed = false;  // unused variable?
   static unsigned long now=0,next_update=0;
   now=micros();
-  if (next_update < now+now+REFRESH_INTERVAL) { // time to poll our buttons again!
+  if (next_update < now) { // time to poll our buttons again!
 	next_update=now+REFRESH_INTERVAL;  // no matter how long it takes us to do all the crap here, our next poll will be ASAP after the refresh time expires.
 	for (int c = 0; c < NUM_COLS; ++c) {
 		byte col = COL_PINS[c];
 		pinMode(col, OUTPUT);
 		digitalWrite(col, LOW);
-		//delayMicroseconds(0);  // perhaps needed to wait for the pin to settle.
 
 		for (int r = 0; r < NUM_ROWS; ++r) {
 		  byte row = ROW_PINS[r];
 		  byte current_button = c * NUM_COLS + r + 1;
 		  
 		  pinMode(row, INPUT_PULLUP);
-  		  //delayMicroseconds(0);  // perhaps needed to wait for the pin to settle.
 		  bool button_state = !digitalRead(row);
 
-		  pinMode(row, INPUT);    // disable the pullup resistor
-		  pinMode(row, OUTPUT);   // set pin to output
-		  digitalWrite(row, LOW); // discharge any potential floating nodes
 		  pinMode(row, INPUT);    // set pin to hi-z
 
 		  if (button_state) {
 			Gamepad.press(current_button);
-			// is_pressed = true; // unused variable?
 
 #ifdef ENABLE_SERIAL
 			  snprintf(msg, MSG_LEN-1, "Row %i, Col %i detected\n", row, col);  // snprintf to avoid buffer overflow in case something wiggy happens
@@ -118,17 +111,15 @@ void loop() {
 	Gamepad.release(NUM_ROWS * NUM_COLS + 2);
 	} 
 
-	Gamepad.xAxis(readAnalog(pinLXAxis,L_XMIN_CALIBRATED,L_XMAX_CALIBRATED);
-	Gamepad.yAxis(-readAnalog(pinLYAxis,L_YMIN_CALIBRATED,L_YMAX_CALIBRATED);
+	Gamepad.xAxis(readAxis(pinLXAxis,L_XMIN_CALIBRATED,L_XMAX_CALIBRATED);
+	Gamepad.yAxis(-readAxis(pinLYAxis,L_YMIN_CALIBRATED,L_YMAX_CALIBRATED);
 
-	Gamepad.rxAxis(readAnalog(pinRXAxis,R_XMIN_CALIBRATED,R_XMAX_CALIBRATED);
-	Gamepad.ryAxis(-readAnalog(pinRYAxis,R_YMIN_CALIBRATED,R_YMAX_CALIBRATED);
+	Gamepad.rxAxis(readAxis(pinRXAxis,R_XMIN_CALIBRATED,R_XMAX_CALIBRATED);
+	Gamepad.ryAxis(-readAxis(pinRYAxis,R_YMIN_CALIBRATED,R_YMAX_CALIBRATED);
 
 	Gamepad.write();
 	}
-
-  delayMicroseconds(REFRESH_INTERVAL);
-} 
+}
 
 void reset() {
   for (int r = 0; r < NUM_ROWS; ++r) {
@@ -150,18 +141,15 @@ void printAnalog(int16_t xval, int16_t yval) {
 inline void printAnalog(const int16_t xval, const int16_t yval) {}  // shouldn't need this at all, because all printAnalog() should be wrapped; just in case.
 #endif
 
-int16_t readAnalog(int pin, const int MIN, const int MAX, bool returnRaw=false) {
+int16_t readAxis(int pin, const int min, const int max, bool returnRaw=false) {
   int16_t ret=0;
   uint16_t read=0;
   
   read=analogRead(pin);
-  
-  if(!returnRaw) {
-    read=constrain(read,MIN,MAX);
-    ret=map(read,MIN,MAX,-32767,32767);
-  }
-  else {
-    ret=read;
-  }
+  if(returnRaw)
+	return read;
+
+  read=constrain(read,min,max);
+  ret=map(read,min,max,-32767,32767);
   return ret;
 }
