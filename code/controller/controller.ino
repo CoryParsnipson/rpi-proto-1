@@ -1,34 +1,36 @@
 #include <HID-Project.h>
 #include <HID-Settings.h>
 
-const int REFRESH_INTERVAL = 1000;
+#define MSG_LEN 80
+
 // change to #define ENABLE_SERIAL if you want serial turned on
 #undef ENABLE_SERIAL
 
-#define MSG_LEN 80
+const int refreshInterval = 1000;
+
 char* msg = new char[MSG_LEN];
 
-const int NUM_ROWS = 4;
-const int NUM_COLS = 4;
+const int numRows = 4;
+const int numCols = 4;
 
-const int ROW_PINS[NUM_ROWS] = { 7, 8, 10, 16 };
-const int COL_PINS[NUM_COLS] = { 3, 4, 14, 15 };
+const int rowPins[numRows] = { 7, 8, 10, 16 };
+const int colPins[numCols] = { 3, 4, 14, 15 };
 
-const int LEFT_THUMBSTICK_BUTTON_PIN = 9;
-const int RIGHT_THUMBSTICK_BUTTON_PIN = 2;
+const int leftThumbstickButtonPin = 9;
+const int rightThumbstickButtonPin = 2;
 
 // These calibrated values are different per individual thumbstick and need to be obtained
 // by reading the value of the analog pins, bringing the thumbstick to the max/min of each axis
 // and then using a number that is ~10 smaller/larger than what is observed.
-const int R_XMIN_CALIBRATED = 85;
-const int R_XMAX_CALIBRATED = 850;
-const int R_YMIN_CALIBRATED = 160;
-const int R_YMAX_CALIBRATED = 840;
+const int rXMinCalibrated = 85;
+const int rXMaxCalibrated = 850;
+const int rYMinCalibrated = 160;
+const int rYMaxCalibrated = 840;
 
-const int L_XMIN_CALIBRATED = 170;
-const int L_XMAX_CALIBRATED = 890;
-const int L_YMIN_CALIBRATED = 100;
-const int L_YMAX_CALIBRATED = 840;
+const int lXMinCalibrated = 170;
+const int lXMaxCalibrated = 890;
+const int lYMinCalibrated = 100;
+const int lYMaxCalibrated = 840;
 
 const int pinLXAxis = A0;
 const int pinLYAxis = A1;
@@ -45,8 +47,8 @@ void setup() {
   digitalWrite(pinRYAxis, LOW);
 
   // thumbstick buttons are not part of key matrix
-  pinMode(LEFT_THUMBSTICK_BUTTON_PIN, INPUT_PULLUP);
-  pinMode(RIGHT_THUMBSTICK_BUTTON_PIN, INPUT_PULLUP);
+  pinMode(leftThumbstickButtonPin, INPUT_PULLUP);
+  pinMode(rightThumbstickButtonPin, INPUT_PULLUP);
     
   reset();
   
@@ -67,16 +69,16 @@ void loop() {
   now = micros();
 
   if (nextUpdate < now) {
-    nextUpdate = now + REFRESH_INTERVAL;
+    nextUpdate = now + refreshInterval;
 
-    for (int c = 0; c < NUM_COLS; ++c) {
-      byte col = COL_PINS[c];
+    for (int c = 0; c < numCols; ++c) {
+      byte col = colPins[c];
       pinMode(col, OUTPUT);
       digitalWrite(col, LOW);
   
-      for (int r = 0; r < NUM_ROWS; ++r) {
-        byte row = ROW_PINS[r];
-        byte current_button = c * NUM_COLS + r + 1;
+      for (int r = 0; r < numRows; ++r) {
+        byte row = rowPins[r];
+        byte current_button = c * numCols + r + 1;
 
         pinMode(row, INPUT_PULLUP);
         bool button_state = !digitalRead(row);
@@ -97,36 +99,36 @@ void loop() {
     }
 
     // left thumbstick button polling
-    if (!digitalRead(LEFT_THUMBSTICK_BUTTON_PIN)) {
-      Gamepad.press(NUM_ROWS * NUM_COLS + 1);
+    if (!digitalRead(leftThumbstickButtonPin)) {
+      Gamepad.press(numRows * numCols + 1);
     } else {
-      Gamepad.release(NUM_ROWS * NUM_COLS + 1);
+      Gamepad.release(numRows * numCols + 1);
     }
 
     // right thumbstick button polling
-    if (!digitalRead(RIGHT_THUMBSTICK_BUTTON_PIN)) {
-      Gamepad.press(NUM_ROWS * NUM_COLS + 2);
+    if (!digitalRead(rightThumbstickButtonPin)) {
+      Gamepad.press(numRows * numCols + 2);
     } else {
-      Gamepad.release(NUM_ROWS * NUM_COLS + 2);
+      Gamepad.release(numRows * numCols + 2);
     } 
 
-    Gamepad.xAxis(readAxis(pinLXAxis, L_XMIN_CALIBRATED, L_XMAX_CALIBRATED));
-    Gamepad.yAxis(-1 * readAxis(pinLYAxis, L_YMIN_CALIBRATED, L_YMAX_CALIBRATED)); // invert y axis
+    Gamepad.xAxis(readAxis(pinLXAxis, lXMinCalibrated, lXMaxCalibrated));
+    Gamepad.yAxis(-1 * readAxis(pinLYAxis, lYMinCalibrated, lYMaxCalibrated)); // invert y axis
     
-    Gamepad.rxAxis(readAxis(pinRXAxis, R_XMIN_CALIBRATED, R_XMAX_CALIBRATED));
-    Gamepad.ryAxis(-1 * readAxis(pinRYAxis, R_YMIN_CALIBRATED, R_YMAX_CALIBRATED)); // invert y axis
+    Gamepad.rxAxis(readAxis(pinRXAxis, rXMinCalibrated, rXMaxCalibrated));
+    Gamepad.ryAxis(-1 * readAxis(pinRYAxis, rYMinCalibrated, rYMaxCalibrated)); // invert y axis
 
     Gamepad.write();
   }
 }
 
 void reset() {
-  for (int r = 0; r < NUM_ROWS; ++r) {
-    pinMode(ROW_PINS[r], INPUT);
+  for (int r = 0; r < numRows; ++r) {
+    pinMode(rowPins[r], INPUT);
   }
   
-  for (int c = 0; c < NUM_COLS; ++c) {
-    pinMode(COL_PINS[c], INPUT_PULLUP);
+  for (int c = 0; c < numCols; ++c) {
+    pinMode(colPins[c], INPUT_PULLUP);
   }
 }
 
