@@ -36,8 +36,8 @@ const int pinRXAxis = A3;
 const int pinRYAxis = A2;
 
 
-inline void printAnalog(const int16_t, const int16_t);
-int16_t readAxis(int, const int, const int, boolean);
+inline void printAnalog(const int16_t x, const int16_t y);
+int16_t readAxis(int pin, const int min, const int max, boolean returnRaw = false);
 
 void setup() {
   digitalWrite(pinLXAxis, LOW);
@@ -111,11 +111,11 @@ void loop() {
 	Gamepad.release(NUM_ROWS * NUM_COLS + 2);
 	} 
 
-	Gamepad.xAxis(readAxis(pinLXAxis,L_XMIN_CALIBRATED,L_XMAX_CALIBRATED);
-	Gamepad.yAxis(-readAxis(pinLYAxis,L_YMIN_CALIBRATED,L_YMAX_CALIBRATED);
+	Gamepad.xAxis(readAxis(pinLXAxis,L_XMIN_CALIBRATED,L_XMAX_CALIBRATED));
+	Gamepad.yAxis(-readAxis(pinLYAxis,L_YMIN_CALIBRATED,L_YMAX_CALIBRATED));
 
-	Gamepad.rxAxis(readAxis(pinRXAxis,R_XMIN_CALIBRATED,R_XMAX_CALIBRATED);
-	Gamepad.ryAxis(-readAxis(pinRYAxis,R_YMIN_CALIBRATED,R_YMAX_CALIBRATED);
+	Gamepad.rxAxis(readAxis(pinRXAxis,R_XMIN_CALIBRATED,R_XMAX_CALIBRATED));
+	Gamepad.ryAxis(-readAxis(pinRYAxis,R_YMIN_CALIBRATED,R_YMAX_CALIBRATED));
 
 	Gamepad.write();
 	}
@@ -141,7 +141,7 @@ void printAnalog(int16_t xval, int16_t yval) {
 inline void printAnalog(const int16_t xval, const int16_t yval) {}  // shouldn't need this at all, because all printAnalog() should be wrapped; just in case.
 #endif
 
-int16_t readAxis(int pin, const int min, const int max, bool returnRaw=false) {
+int16_t readAxis(int pin, const int min, const int max, bool returnRaw) {
   int16_t ret=0;
   uint16_t read=0;
   
