@@ -59,10 +59,14 @@ This is basically thumbstick-v2, dpad\_tactile, and shoulder-buttons-left-v2 fus
 
 This is the right controller half, meant to hold a thumbstick, ABXY buttons, and shoulder buttons in place. This isn't a symmetric version of the left controller because the thumbstick only comes in one orientation so the breakout board is mounted vertically instead of horizontally like in the left side. This makes the right controller frame slightly wider than the left side.
 
-### chassis-v1 [Status: deprecated (up to date)]
+### chassis-v1 [Status: obsolete]
 
 This is the main parts to hold everything together. So far only consists of a part that screws into the screen and holds the two controller halves. This model can be used with no problems, but v2 is better.
 
 ### chassis-v2 [Status: success (up to date)]
 
 This is a re-make with reinforced sides so the controller hooks bend less. The two protoboard holders has been changed to one protoboard holder and one USB Hub holder. This version also has speaker holders and screw holes for the front enclosure to screw into it.
+
+### enclosure-v1 [Status: WIP]
+
+Contains pieces for the outer case (henceforth referred to as the "enclosure"). Also contains models labeled "test-plate-\*" which are smaller pieces used to prototype fit and features (don't need to print these).
