@@ -467,13 +467,14 @@ def handle_battery_charge_state_change(channel):
     global __PREVIOUS_STATE_OF_CHARGE__
 
     charge = get_state_of_charge()
-    draw_hud(battery=charge, is_charging=(not is_discharging()))
+    is_not_charging = is_discharging()
+    draw_hud(battery=charge, is_charging=(not is_not_charging))
 
-    if charge <= CONFIG["LOW_BATTERY_THRESHOLD"] and __PREVIOUS_STATE_OF_CHARGE__ > CONFIG["LOW_BATTERY_THRESHOLD"]:
+    if is_not_charging && charge <= CONFIG["LOW_BATTERY_THRESHOLD"] and __PREVIOUS_STATE_OF_CHARGE__ > CONFIG["LOW_BATTERY_THRESHOLD"]:
         draw_notification("low_battery_warning.png", "low_battery", CONFIG["LOW_BATTERY_NOTIFICATION_DURATION"])
         play_sound("low_battery.mp3")
 
-    if charge <= CONFIG["CRITICAL_BATTERY_THRESHOLD"] and __PREVIOUS_STATE_OF_CHARGE__ > CONFIG["CRITICAL_BATTERY_THRESHOLD"]:
+    if is_not_charging && charge <= CONFIG["CRITICAL_BATTERY_THRESHOLD"] and __PREVIOUS_STATE_OF_CHARGE__ > CONFIG["CRITICAL_BATTERY_THRESHOLD"]:
         __SHUTDOWN_LOCK__.release()
 
     __PREVIOUS_STATE_OF_CHARGE__ = charge
