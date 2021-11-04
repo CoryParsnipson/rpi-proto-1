@@ -23,6 +23,7 @@ CONFIG["IMAGE_PATH"] = "images/"
 CONFIG["SOUND_PATH"] = "sounds/"
 CONFIG["LIB_PATH"] = "lib/"
 CONFIG["PNGVIEW_PATH"] = "pngview"
+CONFIG["SCREENSHOT_PATH"] = "~/screenshots"
 
 CONFIG["LAYER_DEFAULT"] = 15000
 CONFIG["LAYER_BATTERY"] = CONFIG["LAYER_DEFAULT"] + 5
@@ -501,7 +502,9 @@ def handle_power_button_press(channel):
                 toggle_behavior()
         else:
             # long press has happened
-            pass
+            screenshot_call = "raspi2png -c 9 -p " + CONFIG["SCREENSHOT_PATH"] + "/snapshot-" + \
+                datetime.datetime.now().strftime("%m%d%Y-%I%M") + ".png"
+            subprocess.Popen(screenshot_call, shell=True)
     else:
         # input was low, button was pressed
         __LAST_POWER_BUTTON_PRESSED_TIME__ = datetime.datetime.now()
