@@ -503,7 +503,7 @@ def handle_power_button_press(channel):
         else:
             # long press has happened
             screenshot_call = "raspi2png -c 9 -p " + CONFIG["SCREENSHOT_PATH"] + "/snapshot-" + \
-                datetime.datetime.now().strftime("%m%d%Y-%I%M") + ".png"
+                datetime.datetime.now().strftime("%m%d%Y-%H%M%S") + ".png"
             subprocess.Popen(screenshot_call, shell=True)
             draw_notification("snapshot_notification.png", "snapshot", 3)
     else:
